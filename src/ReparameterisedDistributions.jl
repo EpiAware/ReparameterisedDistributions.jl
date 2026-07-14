@@ -36,7 +36,8 @@ using DocStringExtensions: @template, DOCSTRING, EXPORTS, IMPORTS, TYPEDEF,
 
 # Functions we extend for the wrapper.
 import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,
-                      logccdf, quantile, mean, var, sampler
+                      logccdf, quantile, mean, var, sampler, mode, modes,
+                      skewness, kurtosis, entropy
 # Types and constructors we use without extending.
 using Distributions: Distributions, Distribution, LogNormal, VariateForm,
                      ValueSupport

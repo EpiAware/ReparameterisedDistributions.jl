@@ -103,17 +103,62 @@ end
     @test_throws DomainError reparameterise(LogNormal; mean = -8.0, sd = 2.0)
     @test_throws DomainError reparameterise(LogNormal; mean = 8.0, sd = 0.0)
     @test_throws DomainError reparameterise(LogNormal; mean = 8.0, var = -4.0)
+end
 
-    # That the native distribution really would have been valid is the point:
-    # the guard cannot be delegated to Distributions.jl.
+@testitem "reparameterise: an invalid point is -Inf, not an error and not a lie" begin
+    using Distributions
+
+    # `check_args = false` exists so a sampler exploring an unconstrained
+    # parameter gets a density back at an invalid proposal rather than an
+    # exception raised mid-gradient. That is a contract, so it is tested.
+    for bad in (reparameterise(LogNormal; mean = 8.0, sd = -1.0,
+        check_args = false),
+        reparameterise(LogNormal; mean = -8.0, sd = 2.0, check_args = false),
+        reparameterise(LogNormal; mean = 8.0, sd = 0.0, check_args = false),
+        reparameterise(LogNormal; mean = 8.0, var = -4.0, check_args = false))
+        @test logpdf(bad, 4.0) == -Inf
+        @test pdf(bad, 4.0) == 0.0
+    end
+
+    # And the density must not merely be finite-but-wrong. A negative standard
+    # deviation converts to a native distribution that is not just valid but
+    # IDENTICAL to the one a positive standard deviation gives — so without the
+    # guard the density would be finite, equal to the density at +sd, and the
+    # sign would be unidentifiable. Pin that the native really does alias, and
+    # that the wrapper nonetheless refuses it.
     bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
     good = reparameterise(LogNormal; mean = 8.0, sd = 1.0, check_args = false)
     @test ReparameterisedDistributions._native(bad) ≈
           ReparameterisedDistributions._native(good)
+    @test logpdf(bad, 7.5) == -Inf
+    @test isfinite(logpdf(good, 7.5))
+end
 
-    # With the check off, construction succeeds — a sampler probing an invalid
-    # point needs a density, not an exception, mid-gradient.
-    @test bad isa Distribution
+@testitem "reparameterise: keyword order does not change the meaning" begin
+    using Distributions
+
+    # Julia keywords are order-insensitive everywhere else, and the package's
+    # only public entry point must not be the exception.
+    @test reparameterise(LogNormal; sd = 2.0, mean = 8.0) ==
+          reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+    @test reparameterise(LogNormal; var = 4.0, mean = 8.0) ==
+          reparameterise(LogNormal; mean = 8.0, var = 4.0)
+end
+
+@testitem "reparameterise: the moment summaries are reported" begin
+    using Distributions
+
+    # A package sold on moments should be able to report its moments, rather
+    # than reaching a Base generic and failing with an opaque `iterate` error.
+    d = reparameterise(LogNormal; mean = 8.0, sd = 3.0)
+    native = ReparameterisedDistributions._native(d)
+
+    @test mode(d) ≈ mode(native)
+    @test skewness(d) ≈ skewness(native)
+    @test kurtosis(d) ≈ kurtosis(native)
+    @test entropy(d) ≈ entropy(native)
+    @test median(d) ≈ median(native)
+    @test std(d) ≈ std(native)
 end
 
 @testitem "reparameterise: parameters promote to a common type" begin
@@ -130,4 +175,22 @@ end
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     @test occursin("mean = 8.0", sprint(show, d))
     @test occursin("sd = 2.0", sprint(show, d))
+end
+
+@testitem "reparameterise: the rebuild hook promotes like the front door" begin
+    using Distributions
+
+    # `_build` is the ecosystem's leaf-rebuild entry point, so a leaf rebuilt
+    # from a mixed Int/Float tuple must not end up with an abstract
+    # `NTuple{2, Real}` field — that would be boxed, type-unstable and hostile
+    # to a gradient.
+    d = ReparameterisedDistributions._build(LogNormal, (:mean, :sd), (8, 2.0))
+    @test params(d) === (8.0, 2.0)
+    @test eltype(params(d)) === Float64
+    @test d == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+
+    # And it canonicalises the names, so the hook cannot smuggle in an order the
+    # front door would reject.
+    @test ReparameterisedDistributions._build(LogNormal, (:sd, :mean),
+        (2.0, 8.0)) == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 end
