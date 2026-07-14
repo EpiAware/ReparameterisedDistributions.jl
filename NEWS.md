@@ -1,5 +1,32 @@
 ## Unreleased
 
+### The moment-parameterised wrapper
+
+`reparameterise(dist_or_type; moments...)` wraps a Distributions.jl family so
+that the quantities a modeller reasons about are its parameters. The result is an
+ordinary `Distribution`: it evaluates and samples exactly as the native one does
+and goes on the right of a `~`, so a model puts priors directly on a mean and a
+standard deviation and samples in those coordinates. `params` reports the
+moments, not the native parameters that only imply them.
+
+The conversion to the native family is exact algebra rather than a numerical
+solve, so it is differentiable; gradients with respect to the moments are checked
+against ForwardDiff, ReverseDiff, Enzyme (forward and reverse) and Mooncake
+(forward and reverse).
+
+Supported: `LogNormal` by `(mean, sd)` or `(mean, var)`; `Gamma` by `(mean, sd)`,
+`(mean, var)` or `(mean, shape)`; and `NegativeBinomial` by
+`(mean, overdispersion)`, where the overdispersion is the excess variance
+relative to a Poisson (`var = mean + overdispersion * mean^2`).
+
+A wrapper takes its variate form and value support from the family it wraps, so a
+`NegativeBinomial` wrapper stays discrete.
+
+The moments are validated in their own coordinates, not merely through the native
+distribution they imply. The LogNormal and Gamma conversions square the standard
+deviation, so a negative one would otherwise map onto a perfectly valid native
+distribution and the wrapper would report a parameter it does not behave as.
+
 ### Package identity
 
 The package is renamed from `AltDistributions` to `ReparameterisedDistributions`

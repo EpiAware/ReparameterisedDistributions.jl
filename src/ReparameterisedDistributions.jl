@@ -37,10 +37,10 @@ using DocStringExtensions: @template, DOCSTRING, EXPORTS, IMPORTS, TYPEDEF,
 # Functions we extend for the wrapper.
 import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,
                       logccdf, quantile, mean, var, sampler, mode, modes,
-                      skewness, kurtosis, entropy
+                      skewness, kurtosis, entropy, mgf, cf
 # Types and constructors we use without extending.
-using Distributions: Distributions, Distribution, LogNormal, VariateForm,
-                     ValueSupport
+using Distributions: Distributions, Distribution, Gamma, LogNormal,
+                     NegativeBinomial, VariateForm, ValueSupport
 
 # Register the standard EpiAware docstring conventions before any docstrings
 # are defined (see src/docstrings.jl).

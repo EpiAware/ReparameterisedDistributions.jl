@@ -72,9 +72,26 @@ so it is differentiable and the gradient with respect to the moments is exact.
 The package is tested against ForwardDiff, ReverseDiff, Enzyme (forward and
 reverse) and Mooncake (forward and reverse).
 
-Supported today: `LogNormal` by `(mean, sd)` and by `(mean, var)`. Gamma and
-NegativeBinomial (by mean and overdispersion) follow in
-[#20](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/20).
+## Supported parameterisations
+
+| Family | Parameters | Conversion |
+|---|---|---|
+| `LogNormal` | `mean`, `sd` | the moments of the distribution, not of its logarithm |
+| `LogNormal` | `mean`, `var` | as above, given the variance |
+| `Gamma` | `mean`, `sd` | `scale = var / mean`, `shape = mean² / var` |
+| `Gamma` | `mean`, `var` | as above, given the variance |
+| `Gamma` | `mean`, `shape` | `scale = mean / shape`; the shape is native |
+| `NegativeBinomial` | `mean`, `overdispersion` | `var = mean + overdispersion · mean²` |
+
+The `NegativeBinomial` parameterisation is the one epidemiology reaches for: the
+overdispersion is the excess variance relative to a Poisson, so it tends to the
+Poisson limit as it goes to zero. It matches the convention in
+`ComposableTuringIDModels`, and the wrapper stays **discrete** — its value
+support is taken from the family it wraps.
+
+Adding a family is one `_to_native` method (the closed form) and one
+`_check_moments` method (the guard), so a downstream package can register its
+own.
 
 ## Where to learn more
 
