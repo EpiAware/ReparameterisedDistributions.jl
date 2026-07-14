@@ -44,7 +44,14 @@ const FORCE_STUB_TUTORIALS = String[]
 
 # Regexes for URLs to skip during the (full-build) linkcheck, e.g. a page
 # published by a separate workflow that is not yet live.
-const LINKCHECK_IGNORE = Regex[]
+#
+# The stable docs URL 404s until the first tagged release deploys, and the
+# README badge row links it, so the deploy build's linkcheck (a hard error, not
+# a warning) fails without this. Drop the ignore once /stable is live; /dev
+# already resolves.
+const LINKCHECK_IGNORE = [
+    r"^https://epiaware\.org/ReparameterisedDistributions\.jl/stable"
+]
 
 # README -> index.md link rewrites: `from => to` pairs applied line by line,
 # e.g. rewriting an absolute docs URL to an in-site `@ref` so links stay within
@@ -55,7 +62,13 @@ const INDEX_REWRITES = Pair{String, String}[]
 # generated home page. Keep `true` when the README's examples are real, runnable
 # code; set `false` when they are illustrative (placeholder names) and must not
 # execute.
-const README_EXECUTE = true
+#
+# `false` here: the package is unregistered, so the README's only code block is
+# the `Pkg.add(url = ...)` install snippet. Executing it during the docs build
+# installs the package from `main`, which is still the 2024 `AltDistributions`
+# scaffold, into the docs environment and renders that output onto the home
+# page. Revisit once there are real runnable examples to show (#19, #20).
+const README_EXECUTE = false
 
 # README headings whose whole section (heading + body, up to the next heading
 # of the same or a higher level) is dropped when generating the home page. The
