@@ -36,11 +36,45 @@ using Pkg
 Pkg.add(url = "https://github.com/EpiAware/ReparameterisedDistributions.jl")
 ```
 
-This release ships the package's infrastructure. The `reparameterise` wrapper
-and its closed-form conversions (LogNormal and Gamma by mean and standard
-deviation, NegativeBinomial by mean and overdispersion) land next; see issues
-[#19](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/19)
-and [#20](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/20).
+`reparameterise` returns a distribution whose parameters *are* the moments:
+
+```julia
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+
+params(d)      # (8.0, 2.0) — the moments, not the native (mu, sigma)
+mean(d)        # 8.0
+std(d)         # 2.0
+logpdf(d, 7.5)
+```
+
+It is an ordinary `Distribution`, so it evaluates and samples exactly as the
+native one does, and it goes on the right of a `~`. Because the moments are the
+parameters, a model puts its priors on them and the sampler moves in moment
+coordinates:
+
+```julia
+using Turing
+
+@model function delays(x)
+    m ~ LogNormal(2.0, 0.5)
+    s ~ truncated(Normal(2.0, 1.0); lower = 0.1)
+    for i in eachindex(x)
+        x[i] ~ reparameterise(LogNormal; mean = m, sd = s, check_args = false)
+    end
+end
+```
+
+The chain comes back in `m` and `s` — a mean and a standard deviation — rather
+than in native parameters that only imply them. The conversion is exact algebra,
+so it is differentiable and the gradient with respect to the moments is exact.
+The package is tested against ForwardDiff, ReverseDiff, Enzyme (forward and
+reverse) and Mooncake (forward and reverse).
+
+Supported today: `LogNormal` by `(mean, sd)` and by `(mean, var)`. Gamma and
+NegativeBinomial (by mean and overdispersion) follow in
+[#20](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/20).
 
 ## Where to learn more
 
