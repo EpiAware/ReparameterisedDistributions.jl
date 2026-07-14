@@ -15,4 +15,11 @@ concurrency:
 jobs:
   test:
     uses: EpiAware/.github/.github/workflows/tests.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    with:
+      # No LTS (1.10). The kit's test environment pins EpiAwarePackageTools via
+      # `[sources]`, which Pkg only honours on Julia 1.11+. On 1.10 it is
+      # silently ignored and the registered EpiAwarePackageTools v0.1.0 resolves
+      # instead, which predates the `run_package_tests` entry point that the
+      # current `test/runtests.jl` template calls. Matches ModifiedDistributions.
+      julia_versions: '["1", "pre"]'
     secrets: inherit  # pragma: allowlist secret
