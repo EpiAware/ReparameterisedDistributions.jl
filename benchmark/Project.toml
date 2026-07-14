@@ -1,6 +1,20 @@
+# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
+# The benchmark environment, so `julia --project=benchmark benchmark/run.jl`
+# resolves. Seeded with BenchmarkTools, the package, and the shared
+# EpiAwarePackageTools benchmark harness; add AD-backend deps here when the suite
+# benchmarks gradients. EpiAwarePackageTools is pinned by git via `[sources]`
+# until it is registered (mirror the test env's pin if you switch to a path).
 [deps]
-BenchmarkCI = "20533458-34a3-403d-a444-e18f38190b5b"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
-PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
-Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
-TuringBenchmarking = "0db1332d-5c25-4deb-809f-459bc696f94f"
+EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
+ReparameterisedDistributions = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
+
+[sources]
+ReparameterisedDistributions = {path = ".."}
+# Until EpiAwarePackageTools is registered, it is pinned by git so
+# the env resolves out of the box. Switch to a local path to
+# develop the kit alongside this package.
+EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
+
+[compat]
+BenchmarkTools = "1"

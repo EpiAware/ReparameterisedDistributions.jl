@@ -1,12 +1,67 @@
-# priamarycensored.jl
+# ReparameterisedDistributions.jl <img src="docs/src/assets/logo.svg" width="150" alt="ReparameterisedDistributions logo" align="right">
 
-[![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
-![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)
-[![Test AltDistributions](https://github.com/epinowcast/AltDistributions.jl/actions/workflows/test-altdistributions.yaml/badge.svg)](https://github.com/epinowcast/altdistributions.jl/actions/workflows/test-altdistributions.yaml)
-[![codecov](https://codecov.io/gh/epinowcast/altdistributions.jl/graph/badge.svg?token=IX4GIA8F0H)](https://codecov.io/gh/epinowcast/altdistributions.jl)
+<!-- badges:start -->
+| **Documentation** | **Build Status** | **Code Quality** | **License & DOI** | **Downloads** |
+|:-----------------:|:----------------:|:----------------:|:-----------------:|:-------------:|
+| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://epiaware.org/ReparameterisedDistributions.jl/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://epiaware.org/ReparameterisedDistributions.jl/dev/) | [![Test](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/test.yaml) [![codecov](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl) [![AD](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/ad.yaml) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) | [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FReparameterisedDistributions&query=total_requests&label=Downloads)](https://juliapkgstats.com/pkg/ReparameterisedDistributions) [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FReparameterisedDistributions&query=total_requests&suffix=%2Fmonth&label=Downloads)](https://juliapkgstats.com/pkg/ReparameterisedDistributions) |
 
-*Alternative Distribution specifications for extension for Distributions.jl.*
+| ForwardDiff | ReverseDiff (tape) | Enzyme forward | Enzyme reverse | Mooncake reverse | Mooncake forward |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| [![cov ForwardDiff](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-forwarddiff)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-forwarddiff) | [![cov ReverseDiff](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-reversediff)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-reversediff) | [![cov Enzyme forward](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-enzyme-forward)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-enzyme-forward) | [![cov Enzyme reverse](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-enzyme-reverse)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-enzyme-reverse) | [![cov Mooncake reverse](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-mooncake-reverse)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-mooncake-reverse) | [![cov Mooncake forward](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-mooncake-forward)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-mooncake-forward) |
+<!-- badges:end -->
 
-**Websites**: [Organization Website](https://www.epinowcast.org/) | [Documentation](https://www.altdistributions.epinowcast.org/)
+*Parameter-convention switches for Distributions.jl.*
 
-altdistributions.jl Stats: ![altdistributions Stars](https://img.shields.io/github/stars/epinowcast/AltDistributions.jl?style=social)
+## Why ReparameterisedDistributions?
+
+Distributions.jl parameterises each family by its native parameters: a `Gamma`
+by shape and scale, a `LogNormal` by the mean and standard deviation of its
+logarithm. Modellers rarely reason in those coordinates. A delay distribution is
+elicited as a mean and a standard deviation, and a prior belongs on the mean,
+not on a shape parameter that only implies one.
+
+A prior on a moment cannot be expressed through a native leaf, because
+independent priors on shape and scale do not compose into a prior on the mean.
+This package wraps a distribution so that its moments *are* its parameters: the
+wrapper reports the moments as the estimable parameters, converts to the native
+distribution internally through an exact closed form, and stays differentiable
+so the moments can be sampled directly.
+
+## Getting started
+
+The package is not yet registered. Install it from the repository:
+
+```julia
+using Pkg
+Pkg.add(url = "https://github.com/EpiAware/ReparameterisedDistributions.jl")
+```
+
+This release ships the package's infrastructure. The `reparameterise` wrapper
+and its closed-form conversions (LogNormal and Gamma by mean and standard
+deviation, NegativeBinomial by mean and overdispersion) land next; see issues
+[#19](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/19)
+and [#20](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/20).
+
+## Where to learn more
+
+- [Documentation](https://epiaware.org/ReparameterisedDistributions.jl/dev/)
+- [EpiAware](https://github.com/EpiAware), the wider ecosystem this package
+  belongs to.
+
+<!-- standard-sections:start -->
+<!-- MANAGED by EpiAwarePackageTools.scaffold — do not edit between the
+     markers. These standard sections are re-rendered on every scaffold_update;
+     edit the package-owned sections outside them, or CITATION.cff. -->
+
+## Contributing
+
+We welcome contributions and new contributors! Please open an issue or pull request on [GitHub](https://github.com/EpiAware/ReparameterisedDistributions.jl). This package follows [ColPrac](https://github.com/SciML/ColPrac) and the [SciML style](https://github.com/SciML/SciMLStyle).
+
+## How to cite
+
+If you use ReparameterisedDistributions in your work, please cite it. Citation metadata lives in [`CITATION.cff`](https://github.com/EpiAware/ReparameterisedDistributions.jl/blob/main/CITATION.cff), which GitHub renders as a "Cite this repository" button on the repository page.
+
+## Code of conduct
+
+Please note that the ReparameterisedDistributions project is released with a [Contributor Code of Conduct](https://github.com/EpiAware/.github/blob/main/CODE_OF_CONDUCT.md). By contributing, you agree to abide by its terms.
+<!-- standard-sections:end -->

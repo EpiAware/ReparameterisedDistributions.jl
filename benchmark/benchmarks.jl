@@ -1,12 +1,17 @@
-using BenchmarkTools
+# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
+#
+# Benchmark suite definition. Build a BenchmarkTools `BenchmarkGroup` named
+# `SUITE`; the managed `run.jl` / `compare.jl` consume it. Put AD-gradient
+# benchmarks under the `"AD gradients"` group so the comparison comment folds
+# them into a compact per-(scenario x backend) matrix. Edit freely.
 
-SUITE = BenchmarkGroup()
-for folder in readdir(joinpath(@__DIR__, "bench"))
-    if isdir(joinpath(@__DIR__, "bench", folder))
-        suite_name = basename(folder)
-        suite_file = joinpath(@__DIR__, "bench", folder, "$suite_name.jl")
-        if isfile(suite_file)
-            SUITE[suite_name] = include(suite_file)
-        end
-    end
-end
+using BenchmarkTools
+using ReparameterisedDistributions
+
+const SUITE = BenchmarkGroup()
+
+# Example evaluation benchmark — replace with the package's own:
+# SUITE["Evaluation"]["example"] = @benchmarkable sum(rand(100))
+
+# Example AD-gradient group (folded into a matrix by `compare.jl`):
+# SUITE["AD gradients"]["scenario"]["ForwardDiff"] = @benchmarkable ...

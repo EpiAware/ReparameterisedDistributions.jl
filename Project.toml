@@ -1,17 +1,14 @@
-name = "AltDistributions"
-uuid = "b2eeebe4-5992-4301-9193-7ebc9f62c855"
+name = "ReparameterisedDistributions"
+uuid = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
 authors = ["Samuel Abbott", "Michael DeWitt", "Sam Brand"]
 version = "0.1.0-DEV"
 
 [deps]
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-Integrals = "de52edbc-65ea-441a-8357-d3a637375a31"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
-Distributions = ">= 0.25"
-DocStringExtensions = ">= 0.9.0"
-Random = ">= 1.9"
-julia = ">= 1.9"
-Integrals = ">= 4.5"
+DocStringExtensions = "0.9"
+julia = "1.10, 1.11, 1.12"
+
+[workspace]
+projects = ["test", "docs"]

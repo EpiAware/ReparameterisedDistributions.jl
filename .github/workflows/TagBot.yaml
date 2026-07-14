@@ -1,0 +1,19 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
+name: TagBot
+
+on:
+  issue_comment:
+    types:
+      - created
+  workflow_dispatch:
+    inputs:
+      lookback:
+        default: "3"
+
+jobs:
+  TagBot:
+    if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
+    uses: EpiAware/.github/.github/workflows/tagbot.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    with:
+      lookback: ${{ github.event.inputs.lookback || '3' }}
+    secrets: inherit  # pragma: allowlist secret
