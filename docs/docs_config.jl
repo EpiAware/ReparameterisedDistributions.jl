@@ -49,8 +49,14 @@ const FORCE_STUB_TUTORIALS = String[]
 # README badge row links it, so the deploy build's linkcheck (a hard error, not
 # a warning) fails without this. Drop the ignore once /stable is live; /dev
 # already resolves.
+#
+# The managed README also links `CITATION.cff` at `blob/main/`, and that file
+# only reaches `main` when the adoption itself merges — so on the adopting branch
+# the link 404s and fails the build that has to pass before the merge can happen.
+# Drop this second ignore once the adoption has landed on `main`.
 const LINKCHECK_IGNORE = [
-    r"^https://epiaware\.org/ReparameterisedDistributions\.jl/stable"
+    r"^https://epiaware\.org/ReparameterisedDistributions\.jl/stable",
+    r"^https://github\.com/EpiAware/ReparameterisedDistributions\.jl/blob/main/CITATION\.cff"
 ]
 
 # README -> index.md link rewrites: `from => to` pairs applied line by line,
