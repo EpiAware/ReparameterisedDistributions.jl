@@ -1,10 +1,15 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 name: Documenter
+
 on:
   push:
     branches: main
-    tags: [v*]
+    tags: '*'
   pull_request:
   merge_group:
+  release:
+    types: [published]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,20 +17,5 @@ concurrency:
 
 jobs:
   Documenter:
-    permissions:
-      contents: write
-      statuses: write
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v2
-      - uses: julia-actions/cache@v1
-      - run: |
-          julia --project=docs -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
-      - uses: julia-actions/julia-docdeploy@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    uses: EpiAware/.github/.github/workflows/documentation.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    secrets: inherit  # pragma: allowlist secret

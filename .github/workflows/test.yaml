@@ -1,3 +1,4 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 name: Test
 
 on:
@@ -13,17 +14,12 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        julia-version: ['1.10', '1']
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1
-        with:
-          version: ${{ matrix.julia-version }}
-      - uses: julia-actions/cache@v1
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+    uses: EpiAware/.github/.github/workflows/tests.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    with:
+      # No LTS (1.10). The kit's test environment pins EpiAwarePackageTools via
+      # `[sources]`, which Pkg only honours on Julia 1.11+. On 1.10 it is
+      # silently ignored and the registered EpiAwarePackageTools v0.1.0 resolves
+      # instead, which predates the `run_package_tests` entry point that the
+      # current `test/runtests.jl` template calls. Matches ModifiedDistributions.
+      julia_versions: '["1", "pre"]'
+    secrets: inherit  # pragma: allowlist secret

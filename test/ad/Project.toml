@@ -1,0 +1,26 @@
+# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
+# The isolated AD environment (Enzyme, Mooncake, etc. are not main-test deps).
+# Add/trim AD backends to match the package's `ADFixtures` registry and the
+# backends its `test/ad/scenarios.jl` exercises.
+[deps]
+ADFixtures = "38d65565-7409-4a25-8dde-f48d00d9209f"
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+EpiAwarePackageTools = "7aaea248-0d11-4a0d-a7dc-86da30abb951"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
+ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
+TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
+ReparameterisedDistributions = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
+
+[sources]
+ADFixtures = {path = "../ADFixtures"}
+ReparameterisedDistributions = {path = "../.."}
+# Until EpiAwarePackageTools is registered, it is pinned by git so
+# the env resolves out of the box. Switch to a local path to
+# develop the kit alongside this package.
+EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}

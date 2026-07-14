@@ -1,26 +1,14 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 name: Doc Preview Cleanup
 
 on:
   pull_request:
     types: [closed]
 
+permissions:
+  contents: write
+
 jobs:
   doc-preview-cleanup:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-      - name: Delete preview and history + push changes
-        run: |
-            if [ -d "previews/PR$PRNUM" ]; then
-              git config user.name "AltDistributions.jl"
-              git config user.email "AltDistributions@AltDistributions.epinowcast.org"
-              git rm -rf "previews/PR$PRNUM"
-              git commit -m "delete preview"
-              git branch gh-pages-new $(echo "delete history" | git commit-tree HEAD^{tree})
-              git push --force origin gh-pages-new:gh-pages
-            fi
-        env:
-            PRNUM: ${{ github.event.number }}
+    uses: EpiAware/.github/.github/workflows/docs-preview-cleanup.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    secrets: inherit  # pragma: allowlist secret

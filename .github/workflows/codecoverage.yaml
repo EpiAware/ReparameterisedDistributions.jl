@@ -1,3 +1,4 @@
+# MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 name: Code coverage
 
 on:
@@ -13,18 +14,13 @@ concurrency:
 
 jobs:
   coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1
-      - uses: julia-actions/cache@v1
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        with:
-          annotate: true
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v4
-        with:
-          file: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+    uses: EpiAware/.github/.github/workflows/coverage.yml@6fcdcde033ec670ac3832b239427fd2ded591bbc
+    with:
+      julia_version: '1'
+      # Hard-fail the coverage check on an upload error. This is intentional:
+      # a repo with no CODECOV_TOKEN cannot upload on a protected branch
+      # ('Token required because branch is protected'), so CI goes red as a
+      # loud reminder to add the secret. Add CODECOV_TOKEN (repo or org secret)
+      # to make coverage upload — and report — for real.
+      fail_ci_if_error: true
+    secrets: inherit  # pragma: allowlist secret
