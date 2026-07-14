@@ -1,6 +1,6 @@
 # ReparameterisedDistributions.jl benchmark history
 
-Revisions: 2c5211f2387bf8f0b7f5c88fb4d811158c7c8421
+Revisions: 642b084abbad20b7d1c85db1b66045824f215204
 
 See `table.md` for the ratio summary and the PNG
 files in this folder for per-benchmark timelines.
