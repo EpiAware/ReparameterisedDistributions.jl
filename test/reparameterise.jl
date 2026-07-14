@@ -114,8 +114,12 @@ end
     for bad in (reparameterise(LogNormal; mean = 8.0, sd = -1.0,
         check_args = false),
         reparameterise(LogNormal; mean = -8.0, sd = 2.0, check_args = false),
-        reparameterise(LogNormal; mean = 8.0, sd = 0.0, check_args = false),
-        reparameterise(LogNormal; mean = 8.0, var = -4.0, check_args = false))
+        reparameterise(Gamma; mean = 8.0, sd = -1.0, check_args = false),
+        reparameterise(Gamma; mean = 8.0, shape = -1.0, check_args = false),
+        reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.0,
+        check_args = false),
+        reparameterise(NegativeBinomial; mean = -10.0, overdispersion = 0.1,
+        check_args = false))
         @test logpdf(bad, 4.0) == -Inf
         @test pdf(bad, 4.0) == 0.0
     end
@@ -141,8 +145,10 @@ end
     # only public entry point must not be the exception.
     @test reparameterise(LogNormal; sd = 2.0, mean = 8.0) ==
           reparameterise(LogNormal; mean = 8.0, sd = 2.0)
-    @test reparameterise(LogNormal; var = 4.0, mean = 8.0) ==
-          reparameterise(LogNormal; mean = 8.0, var = 4.0)
+    @test reparameterise(Gamma; shape = 3.0, mean = 8.0) ==
+          reparameterise(Gamma; mean = 8.0, shape = 3.0)
+    @test reparameterise(NegativeBinomial; overdispersion = 0.1, mean = 10.0) ==
+          reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1)
 end
 
 @testitem "reparameterise: the moment summaries are reported" begin
@@ -150,13 +156,14 @@ end
 
     # A package sold on moments should be able to report its moments, rather
     # than reaching a Base generic and failing with an opaque `iterate` error.
-    d = reparameterise(LogNormal; mean = 8.0, sd = 3.0)
+    d = reparameterise(Gamma; mean = 8.0, sd = 3.0)
     native = ReparameterisedDistributions._native(d)
 
     @test mode(d) ≈ mode(native)
     @test skewness(d) ≈ skewness(native)
     @test kurtosis(d) ≈ kurtosis(native)
     @test entropy(d) ≈ entropy(native)
+    @test mgf(d, 0.1) ≈ mgf(native, 0.1)
     @test median(d) ≈ median(native)
     @test std(d) ≈ std(native)
 end

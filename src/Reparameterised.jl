@@ -303,6 +303,8 @@ modes(d::Reparameterised) = modes(_native(d))
 skewness(d::Reparameterised) = skewness(_native(d))
 kurtosis(d::Reparameterised) = kurtosis(_native(d))
 entropy(d::Reparameterised) = entropy(_native(d))
+mgf(d::Reparameterised, t::Real) = mgf(_native(d), t)
+cf(d::Reparameterised, t::Real) = cf(_native(d), t)
 
 sampler(d::Reparameterised) = sampler(_native(d))
 Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, _native(d))

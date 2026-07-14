@@ -17,7 +17,7 @@ using ADTypes: AutoForwardDiff, AutoReverseDiff, AutoMooncake,
 using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using Distributions: LogNormal, logpdf, cdf
+using Distributions: Gamma, LogNormal, NegativeBinomial, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -32,6 +32,9 @@ end
 # Observations travel as a `Constant` context rather than a closure capture, so
 # Enzyme differentiates cleanly.
 const _OBS = [4.2, 7.1, 9.8, 12.4, 6.0]
+
+# Counts, for the discrete family.
+const _COUNTS = [3, 8, 12, 5, 21]
 
 # `θ = [mean, sd]` — the coordinates a sampler actually moves in.
 function _meansd_loglik(θ, obs)
@@ -53,6 +56,27 @@ function _meansd_cdf(θ, obs)
     return sum(x -> cdf(d, x), obs)
 end
 
+function _gamma_meansd_loglik(θ, obs)
+    d = reparameterise(Gamma; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The (mean, shape) pair derives only the scale, so it is a different code path
+# from (mean, sd) and can break on its own.
+function _gamma_meanshape_loglik(θ, obs)
+    d = reparameterise(Gamma; mean = θ[1], shape = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The discrete family. Counts are the observations, and the gradient is taken
+# with respect to the mean and the overdispersion — a `1 / a` appears in the
+# conversion, so this is the most fragile of the closed forms under AD.
+function _nbinom_loglik(θ, counts)
+    d = reparameterise(NegativeBinomial; mean = θ[1], overdispersion = θ[2],
+        check_args = false)
+    return sum(k -> logpdf(d, k), counts)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -61,17 +85,24 @@ The AD gradient scenarios. Each is a `DIT.Scenario{:gradient, :out}` whose
 """
 function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     out = DIT.Scenario{:gradient, :out}[]
-    contexts = (Constant(_OBS),)
+    reals = (Constant(_OBS),)
+    counts = (Constant(_COUNTS),)
 
-    cases = (("LogNormal(mean, sd) loglik", _meansd_loglik, [8.0, 2.0]),
-        ("LogNormal(mean, var) loglik", _meanvar_loglik, [8.0, 4.0]),
-        ("LogNormal(mean, sd) cdf", _meansd_cdf, [8.0, 2.0]))
+    cases = (("LogNormal(mean, sd) loglik", _meansd_loglik, [8.0, 2.0], reals),
+        ("LogNormal(mean, var) loglik", _meanvar_loglik, [8.0, 4.0], reals),
+        ("LogNormal(mean, sd) cdf", _meansd_cdf, [8.0, 2.0], reals),
+        ("Gamma(mean, sd) loglik", _gamma_meansd_loglik, [8.0, 3.0], reals),
+        ("Gamma(mean, shape) loglik", _gamma_meanshape_loglik, [8.0, 3.0],
+            reals),
+        ("NegativeBinomial(mean, overdispersion) loglik", _nbinom_loglik,
+            [10.0, 0.1], counts))
 
-    for (name, f, θ) in cases
+    for (name, f, θ, contexts) in cases
         push!(out,
             DIT.Scenario{:gradient, :out}(f, θ, contexts...; name = name,
                 # Prepare at the real point, not at `zero(x)`: a zero mean would
-                # build a degenerate LogNormal and trip a domain error.
+                # build a degenerate distribution and trip a domain error, and a
+                # zero overdispersion would divide by zero.
                 prep_args = (; x = θ, contexts = contexts),
                 res1 = with_reference ? _reference(f, θ, contexts) : nothing))
     end
