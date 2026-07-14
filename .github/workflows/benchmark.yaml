@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ matrix.ref }}
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
       - uses: julia-actions/cache@v1
@@ -89,7 +89,7 @@ jobs:
       # per-revision `benchmark` job above this never runs against an old
       # baseline, so it can safely depend on the kit-shipped script.
       - uses: actions/checkout@v4
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
       - uses: actions/download-artifact@v8
