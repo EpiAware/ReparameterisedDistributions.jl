@@ -58,7 +58,7 @@ build_docs(
     ReparameterisedDistributions;
     repo = "EpiAware/ReparameterisedDistributions.jl",
     authors = "Samuel Abbott, Michael DeWitt, Sam Brand",
-    deploy_url = nothing,
+    deploy_url = "reparameteriseddistributions.epiaware.org",
     pages = _cfg(:pages, ["Home" => "index.md"]),
     skip_notebooks = "--skip-notebooks" in ARGS ||
                      get(ENV, "SKIP_NOTEBOOKS", "false") == "true",

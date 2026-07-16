@@ -45,17 +45,21 @@ const FORCE_STUB_TUTORIALS = String[]
 # Regexes for URLs to skip during the (full-build) linkcheck, e.g. a page
 # published by a separate workflow that is not yet live.
 #
-# The stable docs URL 404s until the first tagged release deploys, and the
-# README badge row links it, so the deploy build's linkcheck (a hard error, not
-# a warning) fails without this. Drop the ignore once /stable is live; /dev
-# already resolves.
+# The whole custom-domain docs site is unreachable over https until GitHub
+# Pages finishes provisioning the TLS certificate for the domain (the Pages
+# `https_certificate.state` is still `new`, not `approved`, and HTTPS is not yet
+# enforced). Until then every `https://reparameteriseddistributions.epiaware.org`
+# link fails to connect, and the README links both `/stable` and `/dev`, so the
+# deploy build's linkcheck (a hard error, not a warning) fails without this.
+# Narrow this back to just `/stable` once the certificate is approved and the
+# site serves over https; drop it entirely once the first tagged release deploys.
 #
 # The managed README also links `CITATION.cff` at `blob/main/`, and that file
 # only reaches `main` when the adoption itself merges — so on the adopting branch
 # the link 404s and fails the build that has to pass before the merge can happen.
 # Drop this second ignore once the adoption has landed on `main`.
 const LINKCHECK_IGNORE = [
-    r"^https://epiaware\.org/ReparameterisedDistributions\.jl/stable",
+    r"^https://reparameteriseddistributions\.epiaware\.org",
     r"^https://github\.com/EpiAware/ReparameterisedDistributions\.jl/blob/main/CITATION\.cff"
 ]
 
