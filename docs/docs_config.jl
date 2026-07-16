@@ -55,7 +55,7 @@ const FORCE_STUB_TUTORIALS = String[]
 # the link 404s and fails the build that has to pass before the merge can happen.
 # Drop this second ignore once the adoption has landed on `main`.
 const LINKCHECK_IGNORE = [
-    r"^https://epiaware\.org/ReparameterisedDistributions\.jl/stable",
+    r"^https://reparameteriseddistributions\.epiaware\.org/stable",
     r"^https://github\.com/EpiAware/ReparameterisedDistributions\.jl/blob/main/CITATION\.cff"
 ]
 
