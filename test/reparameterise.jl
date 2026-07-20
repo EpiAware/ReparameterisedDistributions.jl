@@ -5,7 +5,7 @@
 
     # The whole point: `params` reports the moments, not the native (mu, sigma).
     @test params(d) == (8.0, 2.0)
-    @test params(d) != params(ReparameterisedDistributions._native(d))
+    @test params(d) != params(native(d))
 
     # And the wrapper is a Distribution, so it can stand where one is expected.
     @test d isa Distribution
@@ -21,7 +21,7 @@ end
     # Against the closed form worked by hand from the log-normal moments.
     s2 = log1p((s / m)^2)
     expected = LogNormal(log(m) - s2 / 2, sqrt(s2))
-    @test ReparameterisedDistributions._native(d) ≈ expected
+    @test native(d) ≈ expected
 
     # The conversion is exact, so the moments come back out.
     @test mean(d) ≈ m
@@ -46,19 +46,19 @@ end
     using Distributions
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
-    native = ReparameterisedDistributions._native(d)
+    nd = native(d)
     x = 7.5
 
-    @test logpdf(d, x) ≈ logpdf(native, x)
-    @test pdf(d, x) ≈ pdf(native, x)
-    @test cdf(d, x) ≈ cdf(native, x)
-    @test logcdf(d, x) ≈ logcdf(native, x)
-    @test ccdf(d, x) ≈ ccdf(native, x)
-    @test logccdf(d, x) ≈ logccdf(native, x)
-    @test quantile(d, 0.4) ≈ quantile(native, 0.4)
-    @test insupport(d, x) == insupport(native, x)
-    @test minimum(d) == minimum(native)
-    @test maximum(d) == maximum(native)
+    @test logpdf(d, x) ≈ logpdf(nd, x)
+    @test pdf(d, x) ≈ pdf(nd, x)
+    @test cdf(d, x) ≈ cdf(nd, x)
+    @test logcdf(d, x) ≈ logcdf(nd, x)
+    @test ccdf(d, x) ≈ ccdf(nd, x)
+    @test logccdf(d, x) ≈ logccdf(nd, x)
+    @test quantile(d, 0.4) ≈ quantile(nd, 0.4)
+    @test insupport(d, x) == insupport(nd, x)
+    @test minimum(d) == minimum(nd)
+    @test maximum(d) == maximum(nd)
 end
 
 @testitem "reparameterise: rand draws from the native distribution" begin
@@ -132,8 +132,8 @@ end
     # that the wrapper nonetheless refuses it.
     bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
     good = reparameterise(LogNormal; mean = 8.0, sd = 1.0, check_args = false)
-    @test ReparameterisedDistributions._native(bad) ≈
-          ReparameterisedDistributions._native(good)
+    @test native(bad) ≈
+          native(good)
     @test logpdf(bad, 7.5) == -Inf
     @test isfinite(logpdf(good, 7.5))
 end
@@ -157,15 +157,15 @@ end
     # A package sold on moments should be able to report its moments, rather
     # than reaching a Base generic and failing with an opaque `iterate` error.
     d = reparameterise(Gamma; mean = 8.0, sd = 3.0)
-    native = ReparameterisedDistributions._native(d)
+    nd = native(d)
 
-    @test mode(d) ≈ mode(native)
-    @test skewness(d) ≈ skewness(native)
-    @test kurtosis(d) ≈ kurtosis(native)
-    @test entropy(d) ≈ entropy(native)
-    @test mgf(d, 0.1) ≈ mgf(native, 0.1)
-    @test median(d) ≈ median(native)
-    @test std(d) ≈ std(native)
+    @test mode(d) ≈ mode(nd)
+    @test skewness(d) ≈ skewness(nd)
+    @test kurtosis(d) ≈ kurtosis(nd)
+    @test entropy(d) ≈ entropy(nd)
+    @test mgf(d, 0.1) ≈ mgf(nd, 0.1)
+    @test median(d) ≈ median(nd)
+    @test std(d) ≈ std(nd)
 end
 
 @testitem "reparameterise: parameters promote to a common type" begin

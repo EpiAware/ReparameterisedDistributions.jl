@@ -6,7 +6,7 @@
 # types are public.
 public AbstractReparameterisedDistribution, Reparameterised
 
-# The extension point for a new family: add a `_to_native` method for the
-# (family, parameter-name) pair. It is public because registering a family from
-# outside this package is a supported use, not an internal detail.
-public _to_native
+# `to_native` (the per-family extension point) and `native` (the wrapper-level
+# accessor) are exported instead of merely public — see the main module file —
+# because, unlike this package's other internals, a caller is expected to type
+# these names directly rather than dispatch on a type.

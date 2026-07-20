@@ -92,8 +92,8 @@ overdispersion is the excess variance relative to a Poisson, so it tends to the
 Poisson limit as it goes to zero. The wrapper stays **discrete** — its value
 support is taken from the family it wraps.
 
-Adding a family is one `_to_native` method (the closed form) and one
-`_check_moments` method (the guard), so a downstream package can register its
+Adding a family is one `to_native` method (the closed form) and one
+`_valid_moments` method (the guard), so a downstream package can register its
 own.
 
 ## Where to learn more

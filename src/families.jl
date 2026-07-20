@@ -9,7 +9,7 @@
 #   mean = exp(mu + sigma^2 / 2),  var = mean^2 * (exp(sigma^2) - 1)
 # gives sigma^2 = log1p((sd / mean)^2) and mu = log(mean) - sigma^2 / 2.
 # `log1p` keeps the small-`sd / mean` case accurate.
-function _to_native(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
+function to_native(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     s2 = log1p((sd / mean)^2)
     return LogNormal(log(mean) - s2 / 2, sqrt(s2); check_args = false)
@@ -25,9 +25,9 @@ function _valid_moments(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
 end
 
 # The same, given the variance instead of the standard deviation.
-function _to_native(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
+function to_native(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return _to_native(LogNormal, Val((:mean, :sd)), (mean, sqrt(var)))
+    return to_native(LogNormal, Val((:mean, :sd)), (mean, sqrt(var)))
 end
 
 function _valid_moments(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
@@ -38,7 +38,7 @@ end
 # Gamma by mean and standard deviation. A Gamma(shape, scale) has
 #   mean = shape * scale,  var = shape * scale^2
 # so scale = var / mean and shape = mean / scale = mean^2 / var.
-function _to_native(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
+function to_native(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     scale = sd^2 / mean
     return Gamma(mean / scale, scale; check_args = false)
@@ -52,9 +52,9 @@ function _valid_moments(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
     return mean > 0 && sd > 0
 end
 
-function _to_native(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
+function to_native(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return _to_native(Gamma, Val((:mean, :sd)), (mean, sqrt(var)))
+    return to_native(Gamma, Val((:mean, :sd)), (mean, sqrt(var)))
 end
 
 function _valid_moments(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
@@ -66,7 +66,7 @@ end
 # carries the meaning (a fixed number of exponential stages, say). The shape is
 # native, so only the scale is derived: scale = mean / shape. This is the pair
 # CensoredDistributions registered.
-function _to_native(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
+function to_native(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
     mean, shape = vals
     return Gamma(shape, mean / shape; check_args = false)
 end
@@ -87,7 +87,7 @@ end
 # Note the family is DISCRETE. The wrapper takes its value support from the
 # family, so this stays a discrete distribution rather than silently becoming a
 # continuous one.
-function _to_native(::Type{NegativeBinomial},
+function to_native(::Type{NegativeBinomial},
         ::Val{(:mean, :overdispersion)}, vals)
     mean, a = vals
     p = 1 / (1 + a * mean)

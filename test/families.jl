@@ -8,7 +8,7 @@
     # so scale = var / mean and shape = mean^2 / var.
     scale = s^2 / m
     shape = m^2 / s^2
-    @test ReparameterisedDistributions._native(d) ≈ Gamma(shape, scale)
+    @test native(d) ≈ Gamma(shape, scale)
 
     # The conversion is exact, so the moments come back out.
     @test params(d) == (m, s)
@@ -23,8 +23,8 @@ end
     by_sd = reparameterise(Gamma; mean = 8.0, sd = 3.0)
     by_var = reparameterise(Gamma; mean = 8.0, var = 9.0)
 
-    @test ReparameterisedDistributions._native(by_var) ≈
-          ReparameterisedDistributions._native(by_sd)
+    @test native(by_var) ≈
+          native(by_sd)
     @test params(by_var) == (8.0, 9.0)
 end
 
@@ -36,7 +36,7 @@ end
 
     # The shape is native; the scale is mean / shape. This is the pair
     # CensoredDistributions registered.
-    @test ReparameterisedDistributions._native(d) ≈ Gamma(shape, m / shape)
+    @test native(d) ≈ Gamma(shape, m / shape)
     @test params(d) == (m, shape)
     @test mean(d) ≈ m
     # The implied standard deviation follows from the shape.
@@ -55,7 +55,7 @@ end
     @test var(d)≈m + a * m^2 rtol=1e-10
 
     # Against the native parameters worked by hand: r = 1/a, p = 1/(1 + a*mean).
-    @test ReparameterisedDistributions._native(d) ≈
+    @test native(d) ≈
           NegativeBinomial(1 / a, 1 / (1 + a * m))
 
     @test params(d) == (m, a)
@@ -112,14 +112,14 @@ end
     for d in (reparameterise(Gamma; mean = 8.0, sd = 3.0),
         reparameterise(Gamma; mean = 8.0, shape = 3.0),
         reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1))
-        native = ReparameterisedDistributions._native(d)
+        nd = native(d)
         x = minimum(d) == 0 ? 4 : 4.0
 
-        @test logpdf(d, x) ≈ logpdf(native, x)
-        @test cdf(d, x) ≈ cdf(native, x)
-        @test quantile(d, 0.4) ≈ quantile(native, 0.4)
-        @test mean(d) ≈ mean(native)
-        @test var(d) ≈ var(native)
+        @test logpdf(d, x) ≈ logpdf(nd, x)
+        @test cdf(d, x) ≈ cdf(nd, x)
+        @test quantile(d, 0.4) ≈ quantile(nd, 0.4)
+        @test mean(d) ≈ mean(nd)
+        @test var(d) ≈ var(nd)
 
         # And it draws with the moments it is named by.
         draws = rand(Xoshiro(1), d, 20_000)

@@ -21,11 +21,11 @@
     # The `~` scores exactly as the moments imply, with the priors on top: the
     # wrapper is transparent to the likelihood.
     m, s = 8.0, 2.0
-    native = ReparameterisedDistributions._native(
+    nd = native(
         reparameterise(LogNormal; mean = m, sd = s))
     expected = logpdf(LogNormal(2.0, 0.5), m) +
                logpdf(truncated(Normal(2.0, 1.0); lower = 0.1), s) +
-               sum(x -> logpdf(native, x), obs)
+               sum(x -> logpdf(nd, x), obs)
     @test logjoint(model, (m = m, s = s)) ≈ expected
 end
 
@@ -41,7 +41,7 @@ end
     end
 
     obs = rand(Xoshiro(1),
-        ReparameterisedDistributions._native(
+        native(
             reparameterise(LogNormal; mean = 8.0, sd = 2.0)), 200)
 
     chain = sample(Xoshiro(2), delays(obs), NUTS(), 200; progress = false)

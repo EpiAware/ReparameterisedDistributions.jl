@@ -3,7 +3,7 @@
 A native Distributions.jl family stood up under an alternative parameterisation.
 
 Stores the alternative parameter values in the order of the registered `names`,
-and converts to the native family through [`_to_native`](@ref) whenever a
+and converts to the native family through [`to_native`](@ref) whenever a
 density, moment or sample is asked for. `params` reports the alternative values,
 not the native ones, so it is those that the ecosystem's parameter introspection
 sees and that a prior can be placed on.
@@ -70,7 +70,8 @@ keywords are everywhere else.
     `typeof(d)(params(d)...)` idiom does not rebuild one of these — the family
     and the parameter names live in type parameters. Rebuild through
     `reparameterise` instead. Generic code relying on that idiom will raise
-    rather than silently misbehave.
+    rather than silently misbehave. For the native parameters — the ones the
+    wrapped family was actually built from — use `params(native(d))`.
 
 # Examples
 ```@example
@@ -85,6 +86,16 @@ using ReparameterisedDistributions, Distributions
 
 mean(reparameterise(LogNormal; mean = 8.0, sd = 2.0))
 ```
+
+```@example
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+params(native(d))
+```
+
+# See also
+- [`native`](@ref): the native distribution a wrapper converts to.
 "
 function reparameterise(::Type{D}; check_args::Bool = true,
         alt_params...) where {D <: Distribution}
@@ -156,7 +167,7 @@ an unconstrained parameterisation. Checking at construction alone does not help,
 because that check is precisely what a sampler turns off.
 
 The fallback accepts anything; a family adds a method alongside its
-[`_to_native`](@ref).
+[`to_native`](@ref).
 
 # Arguments
 - the native family being checked for.
@@ -196,23 +207,36 @@ function _check_moments(::Type{D}, ::Val{names}, vals) where {D, names}
 end
 
 # Force the native conversion through the family's own argument checks once, at
-# construction. `_to_native` itself builds with `check_args = false` so it stays
+# construction. `to_native` itself builds with `check_args = false` so it stays
 # branch-free and differentiable on the hot path.
 function _check_native(d::Reparameterised)
-    native = _native(d)
-    Base.typename(typeof(native)).wrapper(Distributions.params(native)...)
+    nd = native(d)
+    Base.typename(typeof(nd)).wrapper(Distributions.params(nd)...)
     return nothing
 end
 
 @doc raw"
 
-Convert a wrapper's alternative parameters to the native distribution.
+The native distribution a wrapper's alternative parameters convert to.
 
-The per-family closed forms are the methods of [`_to_native`](@ref); this is the
-dispatch point every density, moment and sampling method goes through.
+Every density, moment and sampling method on a `Reparameterised` goes through
+this, so it is also the way to reach the native parameters — the ones the
+wrapped family was actually built from — when the moments alone are not
+enough: `params(native(d))` rather than `params(d)`.
+
+# Examples
+```@example
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+native(d), params(native(d))
+```
+
+# See also
+- [`to_native`](@ref): the per-family closed form this dispatches to.
 "
-function _native(d::Reparameterised{D, names}) where {D, names}
-    return _to_native(D, Val(names), d.vals)
+function native(d::Reparameterised{D, names}) where {D, names}
+    return to_native(D, Val(names), d.vals)
 end
 
 @doc raw"
@@ -236,14 +260,14 @@ mid-gradient.
 ```@example
 using ReparameterisedDistributions, Distributions
 
-ReparameterisedDistributions._to_native(
-    LogNormal, Val((:mean, :sd)), (8.0, 2.0))
+to_native(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
 ```
 
 # See also
 - [`reparameterise`](@ref): the public constructor that dispatches to this.
+- [`native`](@ref): the wrapper-level accessor most callers want instead.
 "
-function _to_native(::Type{D}, ::Val{names}, vals) where {D, names}
+function to_native(::Type{D}, ::Val{names}, vals) where {D, names}
     throw(ArgumentError(
         "no reparameterisation of $(D) by $(collect(names)) is registered; " *
         "the registered parameterisations are listed in the package docs"))
@@ -260,10 +284,10 @@ _names(::Reparameterised{D, names}) where {D, names} = names
 
 params(d::Reparameterised) = d.vals
 
-Base.minimum(d::Reparameterised) = minimum(_native(d))
-Base.maximum(d::Reparameterised) = maximum(_native(d))
+Base.minimum(d::Reparameterised) = minimum(native(d))
+Base.maximum(d::Reparameterised) = maximum(native(d))
 
-insupport(d::Reparameterised, x::Real) = insupport(_native(d), x)
+insupport(d::Reparameterised, x::Real) = insupport(native(d), x)
 
 # The type a density must come back as, so that `-Inf` at an invalid point is a
 # `Dual` under AD rather than a bare `Float64` that would break the tape.
@@ -278,36 +302,36 @@ end
 # no draw — asking for one raises, which is the honest answer.
 function logpdf(d::Reparameterised, x::Real)
     _valid(d) || return convert(_restype(d, x), -Inf)
-    return logpdf(_native(d), x)
+    return logpdf(native(d), x)
 end
 
 function pdf(d::Reparameterised, x::Real)
     _valid(d) || return zero(_restype(d, x))
-    return pdf(_native(d), x)
+    return pdf(native(d), x)
 end
 
-cdf(d::Reparameterised, x::Real) = cdf(_native(d), x)
-logcdf(d::Reparameterised, x::Real) = logcdf(_native(d), x)
-ccdf(d::Reparameterised, x::Real) = ccdf(_native(d), x)
-logccdf(d::Reparameterised, x::Real) = logccdf(_native(d), x)
-quantile(d::Reparameterised, q::Real) = quantile(_native(d), q)
+cdf(d::Reparameterised, x::Real) = cdf(native(d), x)
+logcdf(d::Reparameterised, x::Real) = logcdf(native(d), x)
+ccdf(d::Reparameterised, x::Real) = ccdf(native(d), x)
+logccdf(d::Reparameterised, x::Real) = logccdf(native(d), x)
+quantile(d::Reparameterised, q::Real) = quantile(native(d), q)
 
-mean(d::Reparameterised) = mean(_native(d))
-var(d::Reparameterised) = var(_native(d))
+mean(d::Reparameterised) = mean(native(d))
+var(d::Reparameterised) = var(native(d))
 # `std` and `median` fall out of `var` and `quantile`, but these do not, and
 # without them they reach a Base generic and fail with an opaque `iterate` error
 # rather than doing the obvious thing. A package sold on moments should report
 # its moments.
-mode(d::Reparameterised) = mode(_native(d))
-modes(d::Reparameterised) = modes(_native(d))
-skewness(d::Reparameterised) = skewness(_native(d))
-kurtosis(d::Reparameterised) = kurtosis(_native(d))
-entropy(d::Reparameterised) = entropy(_native(d))
-mgf(d::Reparameterised, t::Real) = mgf(_native(d), t)
-cf(d::Reparameterised, t::Real) = cf(_native(d), t)
+mode(d::Reparameterised) = mode(native(d))
+modes(d::Reparameterised) = modes(native(d))
+skewness(d::Reparameterised) = skewness(native(d))
+kurtosis(d::Reparameterised) = kurtosis(native(d))
+entropy(d::Reparameterised) = entropy(native(d))
+mgf(d::Reparameterised, t::Real) = mgf(native(d), t)
+cf(d::Reparameterised, t::Real) = cf(native(d), t)
 
-sampler(d::Reparameterised) = sampler(_native(d))
-Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, _native(d))
+sampler(d::Reparameterised) = sampler(native(d))
+Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, native(d))
 
 function Base.show(io::IO, d::Reparameterised{D, names}) where {D, names}
     args = join(("$n = $v" for (n, v) in zip(names, d.vals)), ", ")
