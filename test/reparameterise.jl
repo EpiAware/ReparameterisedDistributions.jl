@@ -201,13 +201,35 @@ end
     # from a mixed Int/Float tuple must not end up with an abstract
     # `NTuple{2, Real}` field — that would be boxed, type-unstable and hostile
     # to a gradient.
-    d = ReparameterisedDistributions._build(LogNormal, (:mean, :sd), (8, 2.0))
+    d = ReparameterisedDistributions._build(
+        LogNormal, Val((:mean, :sd)), (8, 2.0))
     @test params(d) === (8.0, 2.0)
     @test eltype(params(d)) === Float64
     @test d == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 
     # And it canonicalises the names, so the hook cannot smuggle in an order the
     # front door would reject.
-    @test ReparameterisedDistributions._build(LogNormal, (:sd, :mean),
+    @test ReparameterisedDistributions._build(LogNormal, Val((:sd, :mean)),
         (2.0, 8.0)) == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+end
+
+@testitem "reparameterise: construction is fully inferred" begin
+    using Distributions, Test
+
+    # #45: `_build` used to take `names` as a bare tuple and call `Val(names)`
+    # on it internally, which cannot be inferred concretely from a runtime
+    # argument — `reparameterise`'s own return type came back with free
+    # `names`/`N`/`T` type parameters for any call the compiler did not fully
+    # constant-fold. `names` now arrives as a `Val` at the API boundary
+    # instead, so the whole `Reparameterised{...}` type is inferred, which
+    # matters most exactly where constant folding cannot be relied on: inside
+    # an AD tape.
+    @noinline build(m::Float64, s::Float64) = reparameterise(
+        LogNormal; mean = m, sd = s)
+    @inferred build(8.0, 2.0)
+
+    d = build(8.0, 2.0)
+    @inferred ReparameterisedDistributions._native(d)
+    @inferred logpdf(d, 7.5)
+    @inferred mean(d)
 end

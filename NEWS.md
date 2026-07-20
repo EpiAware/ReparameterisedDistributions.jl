@@ -39,6 +39,19 @@ wrapper converts to — and, through it, the native parameters
 visibility change, so registering a new family from outside this package no
 longer needs the `ReparameterisedDistributions.` qualification.
 
+### Construction is now fully type-inferred
+
+`reparameterise` returned a `Reparameterised` with uninferred `names`, `N`
+and `T` type parameters for any call the compiler did not fully
+constant-fold — `@inferred` on it failed. The cause: the internal `_build`
+took the parameter names as a plain `Tuple{Vararg{Symbol}}` and constructed
+a `Val` from it internally, and `Val(runtime_value)` cannot be inferred
+concretely from a value the caller has not already carried as a type
+parameter. `_build` now takes `Val{names}` directly, so the whole
+`Reparameterised{...}` type is inferred end to end — the case that matters
+most is exactly the one constant folding cannot be relied on inside: an AD
+tape.
+
 ### Package identity
 
 The package is renamed from `AltDistributions` to `ReparameterisedDistributions`

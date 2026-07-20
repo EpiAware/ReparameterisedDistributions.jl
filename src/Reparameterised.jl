@@ -103,7 +103,7 @@ function reparameterise(::Type{D}; check_args::Bool = true,
     isempty(nt) && throw(ArgumentError(
         "reparameterise($(D)) needs the alternative parameters as keywords, " *
         "e.g. reparameterise($(D); mean = 8.0, sd = 2.0)"))
-    return _build(D, keys(nt), Tuple(nt); check_args = check_args)
+    return _build(D, Val(keys(nt)), Tuple(nt); check_args = check_args)
 end
 
 function reparameterise(d::Distribution; kwargs...)
@@ -133,8 +133,20 @@ end
 # here, so both canonicalise and promote alike — a leaf rebuilt from an
 # `Int`/`Float64` mix must not end up with an abstract `NTuple{2, Real}` field,
 # which would be boxed, type-unstable and hostile to a gradient.
-function _build(::Type{D}, names::Tuple{Vararg{Symbol}},
-        vals::Tuple{Vararg{Real}}; check_args::Bool = true) where {D}
+#
+# `names` arrives as a `Val`, not a bare `Tuple{Vararg{Symbol}}`, and that is
+# not stylistic: `Val(runtime_tuple)` cannot be inferred concretely from a
+# plain tuple argument — the value only becomes a type parameter if the
+# CALLER already carried it as one (which `reparameterise` does, via the
+# kwcall specialising on the keyword names) and passes it through as `Val`.
+# Accepting the bare tuple here, and calling `Val(names)` on it inside the
+# function body, was exactly that mistake: `Reparameterised`'s own `names`,
+# `N` and `T` type parameters came back uninferred (`@inferred` on
+# `reparameterise` failed) for any call that was not fully constant-folded —
+# a real risk under AD, where the surrounding tape rarely preserves the
+# constant propagation a bare literal call gets at the top level.
+function _build(::Type{D}, ::Val{names},
+        vals::Tuple{Vararg{Real}}; check_args::Bool = true) where {D, names}
     length(names) == length(vals) || throw(ArgumentError(
         "expected one value per parameter name, got $(length(names)) names " *
         "and $(length(vals)) values"))
