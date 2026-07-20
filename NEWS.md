@@ -43,9 +43,8 @@ A `Reparameterised` now has a richer REPL display: alongside the
 code-reconstructable one-liner, `MIME"text/plain"` also prints the native
 distribution the wrapper actually evaluates as.
 The package gains its own logo, the getting-started page has a runnable
-first example rather than scaffold placeholder text, and stray references
-to packages and names outside this repository's own attribution have been
-removed.
+first example rather than scaffold placeholder text, and a stray reference
+to an unpublished internal package has been removed from the docs.
 
 ### Infrastructure
 

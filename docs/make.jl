@@ -57,7 +57,7 @@ _cfg(sym, default) = isdefined(@__MODULE__, sym) ?
 build_docs(
     ReparameterisedDistributions;
     repo = "EpiAware/ReparameterisedDistributions.jl",
-    authors = "Sam Abbott, EpiAware contributors",
+    authors = "Samuel Abbott, Michael DeWitt, Sam Brand",
     deploy_url = "https://reparameteriseddistributions.epiaware.org",
     pages = _cfg(:pages, ["Home" => "index.md"]),
     skip_notebooks = "--skip-notebooks" in ARGS ||

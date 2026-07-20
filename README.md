@@ -29,6 +29,10 @@ so the moments can be sampled directly.
 
 ## Getting started
 
+For the full walkthrough — every supported parameterisation, how to register
+a new one, and the AD backends it is checked against — see the
+[Getting started documentation](https://reparameteriseddistributions.epiaware.org/dev/getting-started/).
+
 The package is not yet registered. Install it from the repository:
 
 ```julia
@@ -94,6 +98,8 @@ own.
 
 ## Where to learn more
 
+- [Getting started](https://reparameteriseddistributions.epiaware.org/dev/getting-started/),
+  for the full walkthrough.
 - [Documentation](https://reparameteriseddistributions.epiaware.org/dev/)
 - [EpiAware](https://github.com/EpiAware), the wider ecosystem this package
   belongs to.

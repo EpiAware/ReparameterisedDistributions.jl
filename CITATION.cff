@@ -3,7 +3,8 @@ message: "If you use this software, please cite it using these metadata."
 title: "ReparameterisedDistributions.jl"
 type: software
 authors:
-  - name: "Sam Abbott"
-  - name: "EpiAware contributors"
+  - name: "Samuel Abbott"
+  - name: "Michael DeWitt"
+  - name: "Sam Brand"
 repository-code: "https://github.com/EpiAware/ReparameterisedDistributions.jl"
 url: "https://github.com/EpiAware/ReparameterisedDistributions.jl"
