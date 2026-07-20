@@ -12,8 +12,24 @@ using ReparameterisedDistributions
 
 ## A first example
 
-_Replace this with a short, runnable example that shows the package's main
-entry point._
+A delay is elicited as a mean and a standard deviation, and a prior belongs
+on the mean, not on a shape parameter that only implies one.
+`reparameterise` wraps a native family so that the moments are its
+parameters.
+
+```@example getting-started
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+```
+
+`params` reports the moments, not the native `(mu, sigma)` that only implies
+them, and every other method works exactly as it would on the native
+distribution.
+
+```@example getting-started
+params(d), mean(d), std(d), logpdf(d, 7.5)
+```
 
 ## Learning more
 

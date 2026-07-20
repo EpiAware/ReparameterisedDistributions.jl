@@ -85,8 +85,7 @@ reverse) and Mooncake (forward and reverse).
 
 The `NegativeBinomial` parameterisation is the one epidemiology reaches for: the
 overdispersion is the excess variance relative to a Poisson, so it tends to the
-Poisson limit as it goes to zero. It matches the convention in
-`ComposableTuringIDModels`, and the wrapper stays **discrete** — its value
+Poisson limit as it goes to zero. The wrapper stays **discrete** — its value
 support is taken from the family it wraps.
 
 Adding a family is one `_to_native` method (the closed form) and one

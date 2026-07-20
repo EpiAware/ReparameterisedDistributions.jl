@@ -37,6 +37,16 @@ scaffold's UUID is now held in the General registry by `CensoredDistributions`,
 which was derived from that scaffold, and the name `AltDistributions` is held
 there by an unrelated package.
 
+### Polish
+
+A `Reparameterised` now has a richer REPL display: alongside the
+code-reconstructable one-liner, `MIME"text/plain"` also prints the native
+distribution the wrapper actually evaluates as.
+The package gains its own logo, the getting-started page has a runnable
+first example rather than scaffold placeholder text, and stray references
+to packages and names outside this repository's own attribution have been
+removed.
+
 ### Infrastructure
 
 The package adopts the EpiAwarePackageTools managed standard with `ad = true`:
