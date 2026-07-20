@@ -29,6 +29,10 @@ so the moments can be sampled directly.
 
 ## Getting started
 
+For the full walkthrough — every supported parameterisation, how to register
+a new one, and the AD backends it is checked against — see the
+[Getting started documentation](https://reparameteriseddistributions.epiaware.org/dev/getting-started/).
+
 The package is not yet registered. Install it from the repository:
 
 ```julia
@@ -85,8 +89,7 @@ reverse) and Mooncake (forward and reverse).
 
 The `NegativeBinomial` parameterisation is the one epidemiology reaches for: the
 overdispersion is the excess variance relative to a Poisson, so it tends to the
-Poisson limit as it goes to zero. It matches the convention in
-`ComposableTuringIDModels`, and the wrapper stays **discrete** — its value
+Poisson limit as it goes to zero. The wrapper stays **discrete** — its value
 support is taken from the family it wraps.
 
 Adding a family is one `_to_native` method (the closed form) and one
@@ -95,6 +98,8 @@ own.
 
 ## Where to learn more
 
+- [Getting started](https://reparameteriseddistributions.epiaware.org/dev/getting-started/),
+  for the full walkthrough.
 - [Documentation](https://reparameteriseddistributions.epiaware.org/dev/)
 - [EpiAware](https://github.com/EpiAware), the wider ecosystem this package
   belongs to.

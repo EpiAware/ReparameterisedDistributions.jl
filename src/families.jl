@@ -83,8 +83,6 @@ end
 # so a -> 0 recovers the Poisson limit and larger `a` means more clustering. The
 # native `NegativeBinomial(r, p)` has mean = r(1-p)/p and var = mean/p, giving
 #   r = 1 / a,  p = mean / var = 1 / (1 + a * mean).
-# This matches ComposableTuringIDModels' `NegativeBinomialMeanClust`, so the
-# ecosystem agrees on what "overdispersion" means here.
 #
 # Note the family is DISCRETE. The wrapper takes its value support from the
 # family, so this stays a discrete distribution rather than silently becoming a

@@ -184,6 +184,16 @@ end
     @test occursin("sd = 2.0", sprint(show, d))
 end
 
+@testitem "reparameterise: MIME text/plain show also reports the native distribution" begin
+    using Distributions
+
+    d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+    out = sprint(show, MIME("text/plain"), d)
+    @test occursin("mean = 8.0", out)
+    @test occursin("native:", out)
+    @test occursin("LogNormal", out)
+end
+
 @testitem "reparameterise: the rebuild hook promotes like the front door" begin
     using Distributions
 

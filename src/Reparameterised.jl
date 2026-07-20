@@ -313,3 +313,15 @@ function Base.show(io::IO, d::Reparameterised{D, names}) where {D, names}
     args = join(("$n = $v" for (n, v) in zip(names, d.vals)), ", ")
     return print(io, "reparameterise(", D, "; ", args, ")")
 end
+
+# The compact form above stays code-reconstructable, so error messages and
+# `join`/interpolation keep printing something a user can paste back in. The
+# REPL can afford one more line: the native distribution the wrapper
+# actually evaluates as, which is the thing a user most often wants to check
+# when the moments are unfamiliar territory.
+function Base.show(io::IO, ::MIME"text/plain", d::Reparameterised)
+    show(io, d)
+    print(io, "\n  native: ")
+    show(io, _native(d))
+    return nothing
+end
