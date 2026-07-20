@@ -27,6 +27,18 @@ distribution they imply. The LogNormal and Gamma conversions square the standard
 deviation, so a negative one would otherwise map onto a perfectly valid native
 distribution and the wrapper would report a parameter it does not behave as.
 
+### `native` and `to_native` are now exported
+
+The wrapper-level accessor and the per-family extension point were both
+previously underscore-prefixed internals (`_native`, `_to_native`), against
+the org convention that a name a caller is expected to type directly is
+exported rather than merely public. `native(d)` reaches the distribution a
+wrapper converts to — and, through it, the native parameters
+(`params(native(d))`) when the moments alone are not what is needed.
+`to_native(D, Val(names), vals)` is unchanged in behaviour; only its name and
+visibility change, so registering a new family from outside this package no
+longer needs the `ReparameterisedDistributions.` qualification.
+
 ### Package identity
 
 The package is renamed from `AltDistributions` to `ReparameterisedDistributions`
