@@ -16,8 +16,8 @@ compose into a prior on the mean.
 moments. It evaluates and samples exactly as the native distribution does, so it
 can be used directly on the left of a `~`; it converts to the native family
 through an exact closed form; and it stays differentiable, so the moments can be
-sampled. [`native`](@ref) reaches the native distribution — and, through it, the
-native parameters — when the moments alone are not enough.
+sampled. [`native`](@ref) reaches the native distribution — and, through it,
+the native parameters — when the moments alone are not enough.
 
 # Examples
 ```@example
