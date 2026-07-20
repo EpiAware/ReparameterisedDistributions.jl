@@ -96,6 +96,24 @@ Adding a family is one `to_native` method (the closed form) and one
 `_valid_moments` method (the guard), so a downstream package can register its
 own.
 
+## Related packages
+
+- [ComposedDistributions.jl](https://composeddistributions.epiaware.org/dev/)
+  builds delay distributions by composing leaves; a reparameterised leaf
+  carries its moments as its parameters, so a prior sits on a component's mean
+  rather than on a native shape.
+- [ConvolvedDistributions.jl](https://convolveddistributions.epiaware.org/stable/),
+  [ModifiedDistributions.jl](https://modifieddistributions.epiaware.org/dev/)
+  and
+  [CensoredDistributions.jl](https://censoreddistributions.epiaware.org/stable/)
+  build the convolved, transformed and censored distributions this package can
+  wrap in moment coordinates for fitting.
+- [DistributionsInference.jl](https://github.com/EpiAware/DistributionsInference.jl)
+  is the emerging fit-protocol layer across the EpiAware distribution packages,
+  where reparameterising to estimable moments is most useful.
+- [Distributions.jl](https://juliastats.org/Distributions.jl/stable/) supplies
+  the native families whose parameterisation this package switches.
+
 ## Where to learn more
 
 - [Getting started](https://reparameteriseddistributions.epiaware.org/dev/getting-started/),
