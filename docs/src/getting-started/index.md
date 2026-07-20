@@ -71,7 +71,7 @@ asking for one raises.
 
 A wrapper takes its variate form and value support from the family it
 wraps, so the `NegativeBinomial` parameterisation stays **discrete**.
-Adding a family is one `_to_native` method (the closed form) and one
+Adding a family is one `to_native` method (the closed form) and one
 `_valid_moments` method (the guard), so a downstream package can register
 its own — see the [Public API](@ref public-api) and the Internal API page
 in the sidebar.

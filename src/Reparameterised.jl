@@ -346,6 +346,6 @@ end
 function Base.show(io::IO, ::MIME"text/plain", d::Reparameterised)
     show(io, d)
     print(io, "\n  native: ")
-    show(io, _native(d))
+    show(io, native(d))
     return nothing
 end
