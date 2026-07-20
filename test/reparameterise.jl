@@ -229,7 +229,7 @@ end
     @inferred build(8.0, 2.0)
 
     d = build(8.0, 2.0)
-    @inferred ReparameterisedDistributions._native(d)
+    @inferred native(d)
     @inferred logpdf(d, 7.5)
     @inferred mean(d)
 end
