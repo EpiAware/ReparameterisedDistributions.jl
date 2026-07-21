@@ -23,6 +23,15 @@ supplying a dispersion value under the `overdispersion` name (or vice versa)
 silently obtained a distribution with the wrong variance, which is exactly the
 confusion the wrapper exists to remove.
 
+### Rate parameterisations for `Exponential` and `Gamma`
+
+Registers `Exponential(rate)` and `Gamma(shape, rate)`, so a distribution
+written in terms of a hazard rate — the quantity a prior is usually placed on,
+and the quantity one wants reported — no longer has to be hand-inverted to a
+scale before it can be composed. Both invert exactly: `scale = 1 / rate`. A
+non-positive rate is rejected by the validity guard rather than silently
+building an invalid native distribution.
+
 ### The moment-parameterised wrapper
 
 `reparameterise(dist_or_type; moments...)` wraps a Distributions.jl family so

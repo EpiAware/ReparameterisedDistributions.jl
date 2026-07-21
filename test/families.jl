@@ -43,6 +43,32 @@ end
     @test std(d) ≈ m / sqrt(shape)
 end
 
+@testitem "Exponential(rate): the native scale inverted" begin
+    using Distributions
+
+    rate = 0.5
+    d = reparameterise(Exponential; rate = rate)
+
+    # The native Exponential(θ) takes the scale, θ = 1 / rate.
+    @test native(d) ≈ Exponential(1 / rate)
+    @test params(d) == (rate,)
+    @test mean(d) ≈ 1 / rate
+end
+
+@testitem "Gamma(rate, shape): the reciprocal of (mean, shape)" begin
+    using Distributions
+
+    rate, shape = 0.5, 2.0
+    d = reparameterise(Gamma; shape = shape, rate = rate)
+
+    # The shape is native; the scale is 1 / rate.
+    @test native(d) ≈ Gamma(shape, 1 / rate)
+    # The names sort alphabetically ('r' < 's'), so `params` reports
+    # (rate, shape) regardless of the keyword order at the call site.
+    @test params(d) == (rate, shape)
+    @test mean(d) ≈ shape / rate
+end
+
 @testitem "NegativeBinomial(mean, overdispersion): the epi parameterisation" begin
     using Distributions
 
@@ -154,6 +180,10 @@ end
         dispersion = 2.0)
     @test_throws DomainError reparameterise(NegativeBinomial; mean = 10.0,
         dispersion = -2.0)
+    @test_throws DomainError reparameterise(Exponential; rate = -0.5)
+    @test_throws DomainError reparameterise(Exponential; rate = 0.0)
+    @test_throws DomainError reparameterise(Gamma; shape = 2.0, rate = -0.5)
+    @test_throws DomainError reparameterise(Gamma; shape = -2.0, rate = 0.5)
 end
 
 @testitem "the closed forms are usable through the Distributions interface" begin
@@ -162,7 +192,9 @@ end
     for d in (reparameterise(Gamma; mean = 8.0, sd = 3.0),
         reparameterise(Gamma; mean = 8.0, shape = 3.0),
         reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1),
-        reparameterise(NegativeBinomial; mean = 10.0, dispersion = 5.0))
+        reparameterise(NegativeBinomial; mean = 10.0, dispersion = 5.0),
+        reparameterise(Exponential; rate = 0.5),
+        reparameterise(Gamma; shape = 3.0, rate = 0.5))
         nd = native(d)
         x = minimum(d) == 0 ? 4 : 4.0
 

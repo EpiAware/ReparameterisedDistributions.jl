@@ -124,3 +124,34 @@ function _valid_moments(::Type{NegativeBinomial},
     dispersion, mean = vals
     return dispersion > 0 && mean > 0
 end
+
+# Exponential by its rate, the quantity a hazard is usually written over and
+# the quantity one wants reported, rather than the native scale (which is
+# already the mean, but is still the reciprocal of the rate a prior is
+# typically placed on). The native `Exponential(θ)` takes the scale directly,
+# so the conversion is a single inversion: θ = 1 / rate.
+function to_native(::Type{Exponential}, ::Val{(:rate,)}, vals)
+    rate, = vals
+    return Exponential(1 / rate; check_args = false)
+end
+
+function _valid_moments(::Type{Exponential}, ::Val{(:rate,)}, vals)
+    rate, = vals
+    return rate > 0
+end
+
+# Gamma by shape and rate, the reciprocal of the (mean, shape) pair above: the
+# shape is native either way, and here the rate is native too once inverted to
+# a scale, rather than the mean being. `scale = 1 / rate`.
+#
+# The canonical (sorted) name order is `(:rate, :shape)`, not
+# `(:shape, :rate)`: `_canonical` sorts alphabetically, and 'r' < 's'.
+function to_native(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
+    rate, shape = vals
+    return Gamma(shape, 1 / rate; check_args = false)
+end
+
+function _valid_moments(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
+    rate, shape = vals
+    return rate > 0 && shape > 0
+end

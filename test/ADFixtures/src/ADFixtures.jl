@@ -17,7 +17,8 @@ using ADTypes: AutoForwardDiff, AutoReverseDiff, AutoMooncake,
 using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using Distributions: Gamma, LogNormal, NegativeBinomial, logpdf, cdf
+using Distributions: Exponential, Gamma, LogNormal, NegativeBinomial, logpdf,
+                     cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -86,6 +87,20 @@ function _nbinom_dispersion_loglik(θ, counts)
     return sum(k -> logpdf(d, k), counts)
 end
 
+# `θ = [rate]` — a single-parameter family, so this also exercises a
+# length-1 registered name tuple under AD.
+function _exponential_rate_loglik(θ, obs)
+    d = reparameterise(Exponential; rate = θ[1], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The reciprocal of (mean, shape): the rate, not the mean, is native-adjacent
+# here (native scale = 1 / rate), so this is a different code path.
+function _gamma_rateshape_loglik(θ, obs)
+    d = reparameterise(Gamma; rate = θ[1], shape = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -106,7 +121,10 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         ("NegativeBinomial(mean, overdispersion) loglik", _nbinom_loglik,
             [10.0, 0.1], counts),
         ("NegativeBinomial(dispersion, mean) loglik",
-            _nbinom_dispersion_loglik, [2.0, 10.0], counts))
+            _nbinom_dispersion_loglik, [2.0, 10.0], counts),
+        ("Exponential(rate) loglik", _exponential_rate_loglik, [0.5], reals),
+        ("Gamma(rate, shape) loglik", _gamma_rateshape_loglik, [0.5, 3.0],
+            reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,
