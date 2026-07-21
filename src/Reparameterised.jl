@@ -110,6 +110,63 @@ function reparameterise(d::Distribution; kwargs...)
     return reparameterise(Base.typename(typeof(d)).wrapper; kwargs...)
 end
 
+@doc raw"
+
+Scale `d`'s named parameter by `factor`, holding the others fixed.
+
+Routes through whichever moment parameterisation `d` was itself built under —
+the registered `names` its type already carries — so scaling a mean (or any
+other registered parameter) has one home rather than a caller hand-rebuilding
+the wrapper from `params(d)`. An affine transform is not a substitute: for a
+discrete family such as `NegativeBinomial`, scaling the native support does not
+scale the mean cleanly, so the scaling has to happen in moment coordinates and
+convert back through the family's own closed form.
+
+`parameter` must be one of `d`'s registered names, or this throws a
+`DomainError` rather than silently applying the factor under different
+semantics. `d` must itself be a [`Reparameterised`](@ref) distribution — a
+native, unwrapped `Distribution` has no registered parameterisation to route
+through and is rejected with an `ArgumentError` naming the family to wrap
+first.
+
+# Arguments
+- `d`: the distribution to rescale.
+- `factor`: the multiplicative factor applied to `parameter`.
+- `parameter`: the registered name to scale. Defaults to `:mean`.
+- `check_args`: forwarded to the rebuilt wrapper; see [`reparameterise`](@ref).
+
+# Examples
+```@example
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(Gamma; mean = 8.0, shape = 2.0)
+mean(rescale(d, 2.0))
+```
+
+# See also
+- [`reparameterise`](@ref): the constructor `rescale` rebuilds through.
+"
+function rescale(d::Reparameterised{D, names}, factor::Real;
+        parameter::Symbol = :mean, check_args::Bool = true) where {D, names}
+    idx = findfirst(==(parameter), names)
+    idx === nothing && throw(DomainError(parameter,
+        "$(D) is not registered by a `$(parameter)` parameter; the " *
+        "registered parameters are $(names)"))
+    scaled = ntuple(i -> i == idx ? d.vals[i] * factor : d.vals[i],
+        length(names))
+    return _build(D, Val(names), scaled; check_args = check_args)
+end
+
+function rescale(d::Distribution, factor::Real; parameter::Symbol = :mean,
+        check_args::Bool = true)
+    throw(ArgumentError(
+        "rescale needs a distribution built by `reparameterise`, which " *
+        "fixes the registered parameterisation to route through; wrap " *
+        "$(Base.typename(typeof(d)).wrapper) first, e.g. " *
+        "rescale(reparameterise($(Base.typename(typeof(d)).wrapper); " *
+        "mean = ..., ...), $(factor))"))
+end
+
 # Keyword arguments are order-insensitive everywhere else in Julia, but `keys` of
 # a keyword NamedTuple preserves the CALL-SITE order and the conversions dispatch
 # on those names. Sort into a canonical order so that
