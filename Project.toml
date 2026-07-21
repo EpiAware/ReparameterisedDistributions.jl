@@ -1,6 +1,6 @@
 name = "ReparameterisedDistributions"
 uuid = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
-authors = ["Samuel Abbott", "Michael DeWitt", "Sam Brand"]
+authors = ["Sam Abbott", "Michael DeWitt"]
 version = "0.1.0-DEV"
 
 [deps]
