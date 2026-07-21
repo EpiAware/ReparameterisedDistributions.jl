@@ -96,6 +96,29 @@ Adding a family is one `to_native` method (the closed form) and one
 `_valid_moments` method (the guard), so a downstream package can register its
 own.
 
+## Rescaling a moment
+
+`rescale(d, factor)` scales one of `d`'s registered moments by `factor`,
+holding the others fixed, routing through whichever parameterisation `d` was
+built under:
+
+```julia
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(Gamma; mean = 8.0, shape = 2.0)
+mean(rescale(d, 2.0))                      # 16.0 — shape stays at 2.0
+
+nb = reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.5)
+mean(rescale(nb, 3.0))                     # 30.0 — a discrete family, scaled
+                                            # in moment coordinates rather than
+                                            # by an affine transform of the
+                                            # native support
+```
+
+`parameter` defaults to `:mean` and can name any of `d`'s registered
+parameters; naming one that is not registered for `d`'s family raises a
+`DomainError` rather than applying the factor under different semantics.
+
 ## Related packages
 
 - [ComposedDistributions.jl](https://composeddistributions.epiaware.org/dev/)

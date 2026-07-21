@@ -17,7 +17,9 @@ moments. It evaluates and samples exactly as the native distribution does, so it
 can be used directly on the left of a `~`; it converts to the native family
 through an exact closed form; and it stays differentiable, so the moments can be
 sampled. [`native`](@ref) reaches the native distribution — and, through it,
-the native parameters — when the moments alone are not enough.
+the native parameters — when the moments alone are not enough. [`rescale`](@ref)
+scales a registered moment while holding the others fixed, routing through the
+same closed form.
 
 # Examples
 ```@example
@@ -47,10 +49,10 @@ using Distributions: Distributions, Distribution, Gamma, LogNormal,
 # are defined (see src/docstrings.jl).
 include("docstrings.jl")
 
-# The verb, and the two conversion functions, are exported; the wrapper type
+# The verbs, and the two conversion functions, are exported; the wrapper type
 # and its supertype are public but not exported (see public.jl), following
 # the ecosystem convention.
-export reparameterise, to_native, native
+export reparameterise, rescale, to_native, native
 
 # The abstract supertype, then the concrete wrapper and its front door, then the
 # per-family closed-form conversions it dispatches to.

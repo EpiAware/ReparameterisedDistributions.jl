@@ -1,5 +1,18 @@
 ## Unreleased
 
+### `rescale`: scale a registered moment while holding the others fixed
+
+`rescale(d, factor; parameter = :mean)` scales `d`'s named registered
+parameter by `factor`, routing through whichever moment parameterisation `d`
+was itself built under rather than requiring a caller to look up the family's
+registered names and rebuild the wrapper by hand. An affine transform is not a
+substitute for a discrete family such as `NegativeBinomial`, where scaling the
+native support does not scale the mean cleanly; `rescale` scales in moment
+coordinates and reconverts through the family's own closed form. Naming a
+parameter the family is not registered under raises a `DomainError`; calling
+`rescale` on a native, unwrapped `Distribution` raises an `ArgumentError`
+naming the family to wrap first.
+
 ### The moment-parameterised wrapper
 
 `reparameterise(dist_or_type; moments...)` wraps a Distributions.jl family so
