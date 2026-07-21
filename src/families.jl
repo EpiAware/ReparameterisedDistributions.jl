@@ -155,3 +155,36 @@ function _valid_moments(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
     rate, shape = vals
     return rate > 0 && shape > 0
 end
+
+# SkewNormal by its centre, scale and the probability mass below the centre —
+# an elicitation form rather than a moment, but one with an exact closed-form
+# inversion, so it keeps the package's contract of exact, differentiable,
+# solver-free algebra.
+#
+# The native `SkewNormal(xi, omega, alpha)` has location `xi`, scale `omega`
+# and shape `alpha`. For the UNTRUNCATED family the mass below the location
+# depends only on the shape,
+#   P(X < xi) = 1/2 - atan(alpha) / pi
+# which inverts exactly to
+#   alpha = tan(pi * (1/2 - mass_below_centre)),  0 < mass_below_centre < 1.
+# This holds exactly only for the untruncated distribution; a caller who
+# truncates the result gets an approximate, not exact, tail mass.
+#
+# Distributions.jl does not implement `cdf`/`quantile` for `SkewNormal`
+# (Owen's T function is not implemented there), so that limitation is
+# inherited by a wrapper built through this parameterisation exactly as it is
+# by a native `SkewNormal`.
+#
+# The canonical (sorted) name order is `(:centre, :mass_below_centre, :scale)`.
+function to_native(::Type{SkewNormal},
+        ::Val{(:centre, :mass_below_centre, :scale)}, vals)
+    centre, m, scale = vals
+    alpha = tan(pi * (1 / 2 - m))
+    return SkewNormal(centre, scale, alpha; check_args = false)
+end
+
+function _valid_moments(::Type{SkewNormal},
+        ::Val{(:centre, :mass_below_centre, :scale)}, vals)
+    centre, m, scale = vals
+    return scale > 0 && 0 < m < 1
+end

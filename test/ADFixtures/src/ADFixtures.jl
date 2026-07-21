@@ -17,8 +17,8 @@ using ADTypes: AutoForwardDiff, AutoReverseDiff, AutoMooncake,
 using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using Distributions: Exponential, Gamma, LogNormal, NegativeBinomial, logpdf,
-                     cdf
+using Distributions: Exponential, Gamma, LogNormal, NegativeBinomial,
+                     SkewNormal, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -101,6 +101,15 @@ function _gamma_rateshape_loglik(θ, obs)
     return sum(x -> logpdf(d, x), obs)
 end
 
+# `θ = [centre, mass_below_centre, scale]`, the canonical (sorted) order. Not a
+# `cdf` scenario: Distributions.jl has no `cdf` for `SkewNormal` at all (Owen's
+# T is not implemented there), so only the density path is exercised.
+function _skewnormal_loglik(θ, obs)
+    d = reparameterise(SkewNormal; centre = θ[1], mass_below_centre = θ[2],
+        scale = θ[3], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -124,7 +133,9 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
             _nbinom_dispersion_loglik, [2.0, 10.0], counts),
         ("Exponential(rate) loglik", _exponential_rate_loglik, [0.5], reals),
         ("Gamma(rate, shape) loglik", _gamma_rateshape_loglik, [0.5, 3.0],
-            reals))
+            reals),
+        ("SkewNormal(centre, mass_below_centre, scale) loglik",
+            _skewnormal_loglik, [8.0, 0.3, 2.0], reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,
