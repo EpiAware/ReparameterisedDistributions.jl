@@ -41,7 +41,7 @@ EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.
 AlgebraOfGraphics = "0.13"
 CairoMakie = "0.15"
 DataFramesMeta = "0.15"
-DifferentiationInterfaceTest = "0.9, 0.10"
+DifferentiationInterfaceTest = "0.9, 0.10, 0.11"
 Distributions = "0.25"
 Markdown = "1"
 Statistics = "1"
