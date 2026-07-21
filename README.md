@@ -143,7 +143,7 @@ parameters; naming one that is not registered for `d`'s family raises a
   builds delay distributions by composing leaves; a reparameterised leaf
   carries its moments as its parameters, so a prior sits on a component's mean
   rather than on a native shape.
-- [ConvolvedDistributions.jl](https://convolveddistributions.epiaware.org/stable/),
+- [ConvolvedDistributions.jl](https://convolveddistributions.epiaware.org/dev/),
   [ModifiedDistributions.jl](https://modifieddistributions.epiaware.org/dev/)
   and
   [CensoredDistributions.jl](https://censoreddistributions.epiaware.org/stable/)
