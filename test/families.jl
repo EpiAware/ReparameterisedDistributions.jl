@@ -61,6 +61,52 @@ end
     @test params(d) == (m, a)
 end
 
+@testitem "NegativeBinomial(mean, dispersion): the reciprocal convention" begin
+    using Distributions
+
+    m, k = 10.0, 2.0
+    d = reparameterise(NegativeBinomial; mean = m, dispersion = k)
+
+    # The defining relation is var = mean + mean^2 / dispersion, the reciprocal
+    # of the overdispersion convention's var = mean + overdispersion * mean^2.
+    @test mean(d) ≈ m
+    @test var(d)≈m + m^2 / k rtol=1e-10
+
+    # Against the native parameters worked by hand: r = dispersion,
+    # p = dispersion / (dispersion + mean).
+    @test native(d) ≈ NegativeBinomial(k, k / (k + m))
+
+    # The two conventions are reciprocals, so equal spread comes from
+    # `dispersion = 1 / overdispersion`.
+    a = 1 / k
+    @test native(d) ≈
+          native(reparameterise(NegativeBinomial; mean = m, overdispersion = a))
+
+    # The names sort alphabetically ('d' < 'm'), so `params` reports
+    # (dispersion, mean) regardless of the keyword order at the call site.
+    @test params(d) == (k, m)
+    @test params(reparameterise(NegativeBinomial; dispersion = k, mean = m)) ==
+          (k, m)
+end
+
+@testitem "NegativeBinomial: larger dispersion approaches the Poisson" begin
+    using Distributions
+
+    m = 10.0
+    # As dispersion -> Inf the variance falls to the mean, the Poisson limit —
+    # the opposite direction from the overdispersion convention, where the
+    # limit is `a -> 0`.
+    @test var(reparameterise(NegativeBinomial; mean = m,
+        dispersion = 1e6))≈m rtol=1e-4
+    @test var(reparameterise(NegativeBinomial; mean = m,
+        dispersion = 2.0)) > m
+
+    @test_throws DomainError reparameterise(NegativeBinomial; mean = m,
+        dispersion = 0.0)
+    @test_throws DomainError reparameterise(NegativeBinomial; mean = m,
+        dispersion = -1.0)
+end
+
 @testitem "NegativeBinomial stays DISCRETE" begin
     using Distributions
 
@@ -104,6 +150,10 @@ end
         overdispersion = 0.1)
     @test_throws DomainError reparameterise(NegativeBinomial; mean = 10.0,
         overdispersion = -0.1)
+    @test_throws DomainError reparameterise(NegativeBinomial; mean = -1.0,
+        dispersion = 2.0)
+    @test_throws DomainError reparameterise(NegativeBinomial; mean = 10.0,
+        dispersion = -2.0)
 end
 
 @testitem "the closed forms are usable through the Distributions interface" begin
@@ -111,7 +161,8 @@ end
 
     for d in (reparameterise(Gamma; mean = 8.0, sd = 3.0),
         reparameterise(Gamma; mean = 8.0, shape = 3.0),
-        reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1))
+        reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1),
+        reparameterise(NegativeBinomial; mean = 10.0, dispersion = 5.0))
         nd = native(d)
         x = minimum(d) == 0 ? 4 : 4.0
 
