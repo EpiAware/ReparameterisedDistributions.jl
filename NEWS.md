@@ -13,6 +13,16 @@ parameter the family is not registered under raises a `DomainError`; calling
 `rescale` on a native, unwrapped `Distribution` raises an `ArgumentError`
 naming the family to wrap first.
 
+### `NegativeBinomial(mean, dispersion)`: the reciprocal overdispersion convention
+
+Registers a second `NegativeBinomial` parameterisation, `(mean, dispersion)`
+with `var = mean + mean^2 / dispersion`, alongside the existing
+`(mean, overdispersion)` with `var = mean + overdispersion * mean^2`. The two
+are reciprocals (`dispersion = 1 / overdispersion`); previously a caller
+supplying a dispersion value under the `overdispersion` name (or vice versa)
+silently obtained a distribution with the wrong variance, which is exactly the
+confusion the wrapper exists to remove.
+
 ### The moment-parameterised wrapper
 
 `reparameterise(dist_or_type; moments...)` wraps a Distributions.jl family so

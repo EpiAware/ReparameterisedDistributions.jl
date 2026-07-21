@@ -77,6 +77,15 @@ function _nbinom_loglik(θ, counts)
     return sum(k -> logpdf(d, k), counts)
 end
 
+# The reciprocal convention. `θ = [dispersion, mean]`, the canonical (sorted)
+# order the wrapper itself stores, so this exercises the parameterisation the
+# way the closed form actually sees it rather than the call-site order.
+function _nbinom_dispersion_loglik(θ, counts)
+    d = reparameterise(NegativeBinomial; dispersion = θ[1], mean = θ[2],
+        check_args = false)
+    return sum(k -> logpdf(d, k), counts)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -95,7 +104,9 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         ("Gamma(mean, shape) loglik", _gamma_meanshape_loglik, [8.0, 3.0],
             reals),
         ("NegativeBinomial(mean, overdispersion) loglik", _nbinom_loglik,
-            [10.0, 0.1], counts))
+            [10.0, 0.1], counts),
+        ("NegativeBinomial(dispersion, mean) loglik",
+            _nbinom_dispersion_loglik, [2.0, 10.0], counts))
 
     for (name, f, θ, contexts) in cases
         push!(out,

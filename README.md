@@ -86,11 +86,14 @@ reverse) and Mooncake (forward and reverse).
 | `Gamma` | `mean`, `var` | as above, given the variance |
 | `Gamma` | `mean`, `shape` | `scale = mean / shape`; the shape is native |
 | `NegativeBinomial` | `mean`, `overdispersion` | `var = mean + overdispersion · mean²` |
+| `NegativeBinomial` | `mean`, `dispersion` | `var = mean + mean² / dispersion`, the reciprocal convention |
 
-The `NegativeBinomial` parameterisation is the one epidemiology reaches for: the
-overdispersion is the excess variance relative to a Poisson, so it tends to the
-Poisson limit as it goes to zero. The wrapper stays **discrete** — its value
-support is taken from the family it wraps.
+The `NegativeBinomial` parameterisations are the two epidemiology reaches for:
+the overdispersion is the excess variance relative to a Poisson, so it tends to
+the Poisson limit as it goes to zero; the dispersion is its reciprocal
+(`dispersion = 1 / overdispersion`), so it tends to the Poisson limit as it
+goes to infinity instead. The wrapper stays **discrete** — its value support is
+taken from the family it wraps.
 
 Adding a family is one `to_native` method (the closed form) and one
 `_valid_moments` method (the guard), so a downstream package can register its

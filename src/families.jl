@@ -100,3 +100,27 @@ function _valid_moments(::Type{NegativeBinomial},
     mean, a = vals
     return mean > 0 && a > 0
 end
+
+# NegativeBinomial by mean and dispersion, the reciprocal of the overdispersion
+# above and at least as widely used a convention. Here
+#   var = mean + mean^2 / dispersion
+# so `dispersion -> Inf` recovers the Poisson limit rather than `-> 0`. The
+# native `NegativeBinomial(r, p)` is reached directly: `r` is exactly the
+# dispersion, and `p = r / (r + mean)`, which is the algebra a caller would
+# otherwise have to invert from `overdispersion = 1 / dispersion` by hand —
+# the confusion this pair exists to remove.
+#
+# The canonical (sorted) name order is `(:dispersion, :mean)`, not
+# `(:mean, :dispersion)`: `_canonical` sorts alphabetically, and 'd' < 'm'.
+function to_native(::Type{NegativeBinomial},
+        ::Val{(:dispersion, :mean)}, vals)
+    dispersion, mean = vals
+    p = dispersion / (dispersion + mean)
+    return NegativeBinomial(dispersion, p; check_args = false)
+end
+
+function _valid_moments(::Type{NegativeBinomial},
+        ::Val{(:dispersion, :mean)}, vals)
+    dispersion, mean = vals
+    return dispersion > 0 && mean > 0
+end
