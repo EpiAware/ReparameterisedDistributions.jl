@@ -43,7 +43,8 @@ import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,
                       skewness, kurtosis, entropy, mgf, cf
 # Types and constructors we use without extending.
 using Distributions: Distributions, Distribution, Exponential, Gamma,
-                     LogNormal, NegativeBinomial, VariateForm, ValueSupport
+                     LogNormal, NegativeBinomial, SkewNormal, VariateForm,
+                     ValueSupport
 
 # Register the standard EpiAware docstring conventions before any docstrings
 # are defined (see src/docstrings.jl).

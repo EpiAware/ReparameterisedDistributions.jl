@@ -89,6 +89,7 @@ reverse) and Mooncake (forward and reverse).
 | `NegativeBinomial` | `mean`, `overdispersion` | `var = mean + overdispersion · mean²` |
 | `NegativeBinomial` | `mean`, `dispersion` | `var = mean + mean² / dispersion`, the reciprocal convention |
 | `Exponential` | `rate` | `scale = 1 / rate` |
+| `SkewNormal` | `centre`, `scale`, `mass_below_centre` | `alpha = tan(π · (1/2 − mass_below_centre))` |
 
 The `NegativeBinomial` parameterisations are the two epidemiology reaches for:
 the overdispersion is the excess variance relative to a Poisson, so it tends to
@@ -100,6 +101,14 @@ taken from the family it wraps.
 The `Exponential` and `Gamma` rate parameterisations let a distribution be
 specified, reported and estimated directly by its rate rather than by a scale
 hand-inverted from it — the natural coordinates for a hazard.
+
+The `SkewNormal` parameterisation is keyed on an elicitation quantity rather
+than a moment: the probability mass falling below a reference point. That
+mass depends only on the native shape for the untruncated family, so it
+inverts exactly; the docstring notes that the elicited fraction is exact only
+before any truncation. Distributions.jl does not implement `cdf`/`quantile`
+for `SkewNormal` (Owen's T function is not implemented there), a limitation
+this parameterisation inherits rather than works around.
 
 Adding a family is one `to_native` method (the closed form) and one
 `_valid_moments` method (the guard), so a downstream package can register its

@@ -32,6 +32,19 @@ scale before it can be composed. Both invert exactly: `scale = 1 / rate`. A
 non-positive rate is rejected by the validity guard rather than silently
 building an invalid native distribution.
 
+### `SkewNormal(centre, scale, mass_below_centre)`: a tail-probability parameterisation
+
+Registers a fourth family, `SkewNormal`, keyed not on a moment but on the
+probability mass falling below a reference point — a recurring elicitation
+form. For the untruncated family that mass depends only on the native shape
+and inverts exactly (`alpha = tan(pi * (1/2 - mass_below_centre))`), so the
+addition keeps the package's contract of exact, differentiable, solver-free
+algebra. The elicited fraction holds exactly only for the untruncated
+distribution; truncating the result makes it approximate.
+Distributions.jl does not implement `cdf`/`quantile` for `SkewNormal` (Owen's
+T function is not implemented there), a limitation this parameterisation
+inherits rather than works around.
+
 ### The moment-parameterised wrapper
 
 `reparameterise(dist_or_type; moments...)` wraps a Distributions.jl family so

@@ -69,6 +69,69 @@ end
     @test mean(d) ≈ shape / rate
 end
 
+@testitem "SkewNormal(centre, scale, mass_below_centre): the tail-probability form" begin
+    using Distributions
+
+    centre, scale, m = 0.0, 1.0, 0.3
+    d = reparameterise(SkewNormal; centre = centre, scale = scale,
+        mass_below_centre = m)
+
+    # alpha = tan(pi * (1/2 - m)) is the exact inverse of
+    # P(X < centre) = 1/2 - atan(alpha) / pi for the untruncated family.
+    alpha = tan(pi * (1 / 2 - m))
+    @test native(d) ≈ SkewNormal(centre, scale, alpha)
+
+    # Names sort alphabetically ('c' < 'm' < 's'), so `params` reports
+    # (centre, mass_below_centre, scale) regardless of call-site order.
+    @test params(d) == (centre, m, scale)
+
+    # Distributions.jl has no `cdf` for SkewNormal (Owen's T is not
+    # implemented there), so the elicited mass is checked against the closed
+    # form directly rather than via `cdf(d, centre)`, which would MethodError
+    # for a native SkewNormal too.
+    @test 1 / 2 - atan(alpha) / pi≈m rtol=1e-12
+end
+
+@testitem "SkewNormal: a symmetric (m = 1/2) elicitation gives alpha = 0" begin
+    using Distributions
+
+    # Half the mass below the centre is the symmetric case: no skew.
+    d = reparameterise(SkewNormal; centre = 1.0, scale = 2.0,
+        mass_below_centre = 0.5)
+    _, _, alpha = params(native(d))
+    @test alpha≈0.0 atol=1e-12
+    @test mean(d) ≈ 1.0
+end
+
+@testitem "SkewNormal: the closed form validates its moments" begin
+    using Distributions
+
+    @test_throws DomainError reparameterise(SkewNormal; centre = 0.0,
+        scale = -1.0, mass_below_centre = 0.3)
+    @test_throws DomainError reparameterise(SkewNormal; centre = 0.0,
+        scale = 1.0, mass_below_centre = 0.0)
+    @test_throws DomainError reparameterise(SkewNormal; centre = 0.0,
+        scale = 1.0, mass_below_centre = 1.0)
+end
+
+@testitem "SkewNormal is usable through the density/sampling Distributions interface" begin
+    using Distributions, Random, Statistics
+
+    d = reparameterise(SkewNormal; centre = 0.0, scale = 1.0,
+        mass_below_centre = 0.3)
+    nd = native(d)
+
+    # cdf/quantile are not exercised here: Distributions.jl does not
+    # implement them for SkewNormal at all, native or wrapped.
+    @test logpdf(d, 0.5) ≈ logpdf(nd, 0.5)
+    @test pdf(d, 0.5) ≈ pdf(nd, 0.5)
+    @test mean(d) ≈ mean(nd)
+    @test var(d) ≈ var(nd)
+
+    draws = rand(Xoshiro(1), d, 20_000)
+    @test Statistics.mean(draws)≈mean(d) rtol=0.05
+end
+
 @testitem "NegativeBinomial(mean, overdispersion): the epi parameterisation" begin
     using Distributions
 
