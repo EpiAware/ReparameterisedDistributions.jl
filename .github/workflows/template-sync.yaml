@@ -55,7 +55,7 @@ jobs:
               using Pkg
               Pkg.activate(; temp = true); Pkg.add(url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main")
               using EpiAwarePackageTools
-              res = scaffold_update("."; ad = true, benchmarks = true, downgrade_compat = false)
+              res = EpiAwarePackageTools.scaffold_update("."; ad = true, benchmarks = true, downgrade_compat = false)
               println("re-applied ", length(res.updated), " managed files")'
       # Dependabot PR: commit the refresh onto the PR branch so the action bump
       # and the infra refresh land together. Needs "Allow GitHub Actions to
