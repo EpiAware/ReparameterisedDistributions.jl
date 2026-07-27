@@ -16,6 +16,7 @@
 ADFixtures = "38d65565-7409-4a25-8dde-f48d00d9209f"
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Chairmarks = "0ca39b1e-fe0b-4e98-acfc-b1656634c4de"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
 DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -40,6 +41,7 @@ EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.
 [compat]
 AlgebraOfGraphics = "0.13"
 CairoMakie = "0.15"
+Chairmarks = "1"
 DataFramesMeta = "0.15"
 DifferentiationInterfaceTest = "0.9, 0.10"
 Distributions = "0.25"
