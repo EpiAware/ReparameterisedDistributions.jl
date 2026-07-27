@@ -1,6 +1,6 @@
 #src MANAGED by EpiAwarePackageTools.scaffold — do not edit by hand.
 #src Generalised from CensoredDistributions.jl's AD-backends page (the org
-#src model page). The page body is re-applied on every scaffold_update so it
+#src model page). The page body is re-applied on every update so it
 #src stays kit-current; everything package-specific it reports (scenarios,
 #src backends, broken/skip declarations) is read at docs-build time from the
 #src package-owned `test/ADFixtures` registry, so declare a broken scenario
@@ -108,6 +108,9 @@ md"""
 
 using ReparameterisedDistributions
 import DifferentiationInterfaceTest as DIT
+## DIT 0.11 dropped its Chairmarks dependency; `benchmark_differentiation`
+## needs it loaded explicitly to resolve `run_benchmark!`.
+using Chairmarks
 using DataFramesMeta
 using Statistics
 using CairoMakie
