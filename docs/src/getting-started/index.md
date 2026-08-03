@@ -68,6 +68,10 @@ asking for one raises.
 | `Gamma` | `mean`, `var` | as above, given the variance |
 | `Gamma` | `mean`, `shape` | `scale = mean / shape`; the shape is native |
 | `NegativeBinomial` | `mean`, `overdispersion` | `var = mean + overdispersion · mean²` |
+| `Beta` | `mean`, `sd` | `nu = mean·(1−mean)/var − 1`; `alpha = mean·nu`, `beta = (1−mean)·nu` |
+| `Beta` | `mean`, `var` | as above, given the variance |
+| `InverseGaussian` | `mean`, `sd` | `lambda = mean³ / var`; the mean is native |
+| `InverseGaussian` | `mean`, `var` | as above, given the variance |
 
 A wrapper takes its variate form and value support from the family it
 wraps, so the `NegativeBinomial` parameterisation stays **discrete**.
