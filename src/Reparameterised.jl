@@ -191,6 +191,12 @@ end
 # `Int`/`Float64` mix must not end up with an abstract `NTuple{2, Real}` field,
 # which would be boxed, type-unstable and hostile to a gradient.
 #
+# `ReparameterisedDistributionsComposedDistributionsExt`'s
+# `ComposedDistributions.leaf_ctor` callable is the ecosystem hook referred to
+# above: it calls this with the positional value tuple `leaf_ctor` receives
+# and the leaf's own registered `names` as a `Val`. That call site is across a
+# package boundary, so this `Val(names)` signature should not change casually.
+#
 # `names` arrives as a `Val`, not a bare `Tuple{Vararg{Symbol}}`, and that is
 # not stylistic: `Val(runtime_tuple)` cannot be inferred concretely from a
 # plain tuple argument — the value only becomes a type parameter if the
