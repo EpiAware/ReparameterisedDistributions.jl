@@ -107,7 +107,7 @@ rather than applying the factor under different semantics.
 
 ## Composing with ComposedDistributions
 
-Loading [ComposedDistributions](https://epiaware.github.io/ComposedDistributions.jl) lets a `reparameterise`d leaf sit inside a composed tree and be introspected in its registered moments, not the wrapped family's native parameters.
+Loading [ComposedDistributions](https://composeddistributions.epiaware.org/dev/) lets a `reparameterise`d leaf sit inside a composed tree and be introspected in its registered moments, not the wrapped family's native parameters.
 
 ```julia
 using ComposedDistributions

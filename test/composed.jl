@@ -225,6 +225,49 @@ end
     @test_throws ArgumentError uncertain(d; mean = "8")
 end
 
+@testitem "Composed: a Truncated leaf reports/rebuilds in moments" tags=[
+    :composed] begin
+    using Distributions, ComposedDistributions
+
+    d = truncated(reparameterise(LogNormal; mean = 8.0, sd = 2.0);
+        upper = 20.0)
+    tree = compose((delay = d,))
+    tbl = params_table(tree)
+
+    # `param_names`/`leaf_ctor` are read through `free_leaf`, so the
+    # Truncated wrapper must not shadow the registered moment names with
+    # the native `mu`/`sigma`, nor with positional `:param_1`/`:param_2`.
+    @test collect(tbl.param) == [:mean, :sd]
+    @test collect(tbl.value) == [8.0, 2.0]
+
+    updated = ComposedDistributions.update(tree,
+        (delay = (mean = 10.0, sd = 3.0),))
+    leaf = updated.components[1]
+
+    # `rewrap_leaf` must restore the Truncated wrapper around the rebuilt
+    # Reparameterised leaf, not return the bare rebuilt leaf.
+    @test leaf isa Truncated
+    @test leaf.upper == 20.0
+    @test leaf.untruncated isa ReparameterisedDistributions.Reparameterised{
+        LogNormal, (:mean, :sd)}
+    @test params(leaf.untruncated) == (10.0, 3.0)
+end
+
+@testitem "Composed: update propagates DomainError for invalid moments" tags=[
+    :composed] begin
+    using Distributions, ComposedDistributions
+
+    d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+    tree = compose((delay = d, tail = LogNormal(0.5, 0.4)))
+    @test_throws DomainError ComposedDistributions.update(tree,
+        (delay = (mean = 8.0, sd = -2.0), tail = (mu = 0.5, sigma = 0.4)))
+
+    nb = reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.5)
+    nb_tree = compose((a = nb,))
+    @test_throws DomainError ComposedDistributions.update(nb_tree,
+        (a = (mean = 10.0, overdispersion = 0.0),))
+end
+
 @testitem "Composed: flat codec round-trip (upstream-blocked)" tags=[
     :composed] begin
     using Distributions, ComposedDistributions
