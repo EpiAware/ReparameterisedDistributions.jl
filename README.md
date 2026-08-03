@@ -90,6 +90,10 @@ reverse) and Mooncake (forward and reverse).
 | `NegativeBinomial` | `mean`, `dispersion` | `var = mean + mean² / dispersion`, the reciprocal convention |
 | `Exponential` | `rate` | `scale = 1 / rate` |
 | `SkewNormal` | `centre`, `scale`, `mass_below_centre` | `alpha = tan(π · (1/2 − mass_below_centre))` |
+| `Beta` | `mean`, `sd` | `nu = mean·(1−mean)/var − 1`; `alpha = mean·nu`, `beta = (1−mean)·nu` |
+| `Beta` | `mean`, `var` | as above, given the variance |
+| `InverseGaussian` | `mean`, `sd` | `lambda = mean³ / var`; the mean is native |
+| `InverseGaussian` | `mean`, `var` | as above, given the variance |
 
 The `NegativeBinomial` parameterisations are the two epidemiology reaches for:
 the overdispersion is the excess variance relative to a Poisson, so it tends to
@@ -109,6 +113,20 @@ inverts exactly; the docstring notes that the elicited fraction is exact only
 before any truncation. Distributions.jl does not implement `cdf`/`quantile`
 for `SkewNormal` (Owen's T function is not implemented there), a limitation
 this parameterisation inherits rather than works around.
+
+`Beta(mean, sd)` is the natural coordinates for a probability-scale quantity
+elicited as a central value and an uncertainty — a reporting fraction or a
+case-fatality ratio, say. A Beta's variance cannot exceed `mean * (1 - mean)`,
+the variance of a Bernoulli with the same mean; a standard deviation too wide
+for its mean has no Beta at all, and the validity guard rejects it rather than
+silently clipping it to the boundary.
+
+`InverseGaussian(mean, sd)` reparameterises the one family here whose native
+form already takes the mean directly (`InverseGaussian(mu, lambda)`), so only
+the shape needs deriving: `lambda = mean^3 / var`. The family is a
+first-passage-time distribution — the hitting time of a drifting Wiener
+process — which makes it a genuine alternative to the Gamma and log-normal
+for a right-skewed delay such as an incubation period.
 
 Adding a family is one `to_native` method (the closed form) and one
 `_valid_moments` method (the guard), so a downstream package can register its

@@ -132,6 +132,125 @@ end
     @test Statistics.mean(draws)≈mean(d) rtol=0.05
 end
 
+@testitem "Beta(mean, sd): exact closed form" begin
+    using Distributions
+
+    m, s = 0.3, 0.1
+    d = reparameterise(Beta; mean = m, sd = s)
+
+    # nu = mean * (1 - mean) / var - 1; alpha = mean * nu, beta = (1-mean)*nu.
+    nu = m * (1 - m) / s^2 - 1
+    @test native(d) ≈ Beta(m * nu, (1 - m) * nu)
+
+    # The conversion is exact, so the moments come back out.
+    @test params(d) == (m, s)
+    @test mean(d) ≈ m
+    @test std(d)≈s rtol=1e-10
+    @test var(d)≈s^2 rtol=1e-10
+end
+
+@testitem "Beta(mean, var) agrees with Beta(mean, sd)" begin
+    using Distributions
+
+    by_sd = reparameterise(Beta; mean = 0.3, sd = 0.1)
+    by_var = reparameterise(Beta; mean = 0.3, var = 0.01)
+
+    @test native(by_var) ≈ native(by_sd)
+    @test params(by_var) == (0.3, 0.01)
+end
+
+@testitem "Beta: the closed form validates its moments" begin
+    using Distributions
+
+    # Out of (0, 1).
+    @test_throws DomainError reparameterise(Beta; mean = 0.0, sd = 0.1)
+    @test_throws DomainError reparameterise(Beta; mean = 1.0, sd = 0.1)
+    @test_throws DomainError reparameterise(Beta; mean = -0.1, sd = 0.1)
+    @test_throws DomainError reparameterise(Beta; mean = 0.3, sd = -0.1)
+
+    # A Beta's variance cannot exceed mean * (1 - mean), the variance of a
+    # Bernoulli with the same mean: mean = 0.5 caps the variance at 0.25, so a
+    # standard deviation of 0.5 is too wide for any Beta to have this mean.
+    @test_throws DomainError reparameterise(Beta; mean = 0.5, sd = 0.5)
+    @test_throws DomainError reparameterise(Beta; mean = 0.5, var = 0.3)
+
+    # Just inside the bound is valid.
+    @test reparameterise(Beta; mean = 0.5, sd = 0.49) isa
+          ReparameterisedDistributions.Reparameterised
+end
+
+@testitem "Beta is usable through the density/sampling Distributions interface" begin
+    using Distributions, Random, Statistics
+
+    d = reparameterise(Beta; mean = 0.3, sd = 0.1)
+    nd = native(d)
+
+    @test logpdf(d, 0.4) ≈ logpdf(nd, 0.4)
+    @test cdf(d, 0.4) ≈ cdf(nd, 0.4)
+    @test quantile(d, 0.4) ≈ quantile(nd, 0.4)
+    @test mean(d) ≈ mean(nd)
+    @test var(d) ≈ var(nd)
+
+    draws = rand(Xoshiro(1), d, 20_000)
+    @test Statistics.mean(draws)≈mean(d) rtol=0.05
+end
+
+@testitem "InverseGaussian(mean, sd): exact closed form" begin
+    using Distributions
+
+    m, s = 3.0, 2.0
+    d = reparameterise(InverseGaussian; mean = m, sd = s)
+
+    # The native `InverseGaussian(mu, lambda)` is already keyed on the mean;
+    # var = mu^3 / lambda gives lambda = mean^3 / var.
+    lambda = m^3 / s^2
+    @test native(d) ≈ InverseGaussian(m, lambda)
+
+    @test params(d) == (m, s)
+    @test mean(d) ≈ m
+    @test std(d)≈s rtol=1e-10
+    @test var(d)≈s^2 rtol=1e-10
+end
+
+@testitem "InverseGaussian(mean, var) agrees with InverseGaussian(mean, sd)" begin
+    using Distributions
+
+    by_sd = reparameterise(InverseGaussian; mean = 3.0, sd = 2.0)
+    by_var = reparameterise(InverseGaussian; mean = 3.0, var = 4.0)
+
+    @test native(by_var) ≈ native(by_sd)
+    @test params(by_var) == (3.0, 4.0)
+end
+
+@testitem "InverseGaussian: the closed form validates its moments" begin
+    using Distributions
+
+    @test_throws DomainError reparameterise(InverseGaussian; mean = -3.0,
+        sd = 2.0)
+    @test_throws DomainError reparameterise(InverseGaussian; mean = 0.0,
+        sd = 2.0)
+    @test_throws DomainError reparameterise(InverseGaussian; mean = 3.0,
+        sd = -2.0)
+    @test_throws DomainError reparameterise(InverseGaussian; mean = 3.0,
+        var = -4.0)
+end
+
+@testitem "InverseGaussian is usable through the density/sampling Distributions interface" begin
+    using Distributions, Random, Statistics
+
+    d = reparameterise(InverseGaussian; mean = 3.0, sd = 2.0)
+    nd = native(d)
+
+    @test logpdf(d, 2.0) ≈ logpdf(nd, 2.0)
+    @test cdf(d, 2.0) ≈ cdf(nd, 2.0)
+    @test quantile(d, 0.4) ≈ quantile(nd, 0.4)
+    @test mean(d) ≈ mean(nd)
+    @test var(d) ≈ var(nd)
+
+    draws = rand(Xoshiro(1), d, 20_000)
+    @test Statistics.mean(draws)≈mean(d) rtol=0.05
+end
+
 @testitem "NegativeBinomial(mean, overdispersion): the epi parameterisation" begin
     using Distributions
 
@@ -247,6 +366,12 @@ end
     @test_throws DomainError reparameterise(Exponential; rate = 0.0)
     @test_throws DomainError reparameterise(Gamma; shape = 2.0, rate = -0.5)
     @test_throws DomainError reparameterise(Gamma; shape = -2.0, rate = 0.5)
+    @test_throws DomainError reparameterise(Beta; mean = 0.5, sd = 0.5)
+    @test_throws DomainError reparameterise(Beta; mean = 1.5, sd = 0.1)
+    @test_throws DomainError reparameterise(InverseGaussian; mean = -3.0,
+        sd = 2.0)
+    @test_throws DomainError reparameterise(InverseGaussian; mean = 3.0,
+        sd = -2.0)
 end
 
 @testitem "the closed forms are usable through the Distributions interface" begin
@@ -257,7 +382,9 @@ end
         reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1),
         reparameterise(NegativeBinomial; mean = 10.0, dispersion = 5.0),
         reparameterise(Exponential; rate = 0.5),
-        reparameterise(Gamma; shape = 3.0, rate = 0.5))
+        reparameterise(Gamma; shape = 3.0, rate = 0.5),
+        reparameterise(Beta; mean = 0.3, sd = 0.1),
+        reparameterise(InverseGaussian; mean = 3.0, sd = 2.0))
         nd = native(d)
         x = minimum(d) == 0 ? 4 : 4.0
 
@@ -271,4 +398,28 @@ end
         draws = rand(Xoshiro(1), d, 20_000)
         @test Statistics.mean(draws)≈mean(d) rtol=0.05
     end
+end
+
+@testitem "Beta and InverseGaussian: construction is fully inferred" begin
+    using Distributions, Test
+
+    # Mirrors the LogNormal check in test/reparameterise.jl (#45): `names`
+    # arrives as a `Val` at the API boundary, so the whole `Reparameterised`
+    # type — not just its value — is inferred even behind a function
+    # boundary the compiler cannot constant-fold through.
+    @noinline build_beta(m::Float64, s::Float64) = reparameterise(
+        Beta; mean = m, sd = s)
+    @inferred build_beta(0.3, 0.1)
+    db = build_beta(0.3, 0.1)
+    @inferred native(db)
+    @inferred logpdf(db, 0.4)
+    @inferred mean(db)
+
+    @noinline build_ig(m::Float64, s::Float64) = reparameterise(
+        InverseGaussian; mean = m, sd = s)
+    @inferred build_ig(3.0, 2.0)
+    dig = build_ig(3.0, 2.0)
+    @inferred native(dig)
+    @inferred logpdf(dig, 2.0)
+    @inferred mean(dig)
 end

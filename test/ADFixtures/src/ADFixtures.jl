@@ -17,8 +17,8 @@ using ADTypes: AutoForwardDiff, AutoReverseDiff, AutoMooncake,
 using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using Distributions: Exponential, Gamma, LogNormal, NegativeBinomial,
-                     SkewNormal, logpdf, cdf
+using Distributions: Beta, Exponential, Gamma, InverseGaussian, LogNormal,
+                     NegativeBinomial, SkewNormal, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -36,6 +36,9 @@ const _OBS = [4.2, 7.1, 9.8, 12.4, 6.0]
 
 # Counts, for the discrete family.
 const _COUNTS = [3, 8, 12, 5, 21]
+
+# Proportions, for Beta: its support is (0, 1), so `_OBS` does not fit.
+const _PROPS = [0.12, 0.35, 0.28, 0.41, 0.19]
 
 # `θ = [mean, sd]` — the coordinates a sampler actually moves in.
 function _meansd_loglik(θ, obs)
@@ -110,6 +113,23 @@ function _skewnormal_loglik(θ, obs)
     return sum(x -> logpdf(d, x), obs)
 end
 
+# `θ = [mean, sd]`. The conversion divides by `sd^2` twice over (once inside
+# `nu`, once again through `alpha`/`beta`), so this is the fragile case among
+# the new closed forms under AD.
+function _beta_meansd_loglik(θ, props)
+    d = reparameterise(Beta; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), props)
+end
+
+# `θ = [mean, sd]`. Unlike Gamma, the mean is already native here (the
+# conversion only derives the shape), so this exercises a closed form that
+# differentiates through a cube rather than a ratio of squares.
+function _invgauss_meansd_loglik(θ, obs)
+    d = reparameterise(InverseGaussian; mean = θ[1], sd = θ[2],
+        check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -120,6 +140,7 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
     out = DIT.Scenario{:gradient, :out}[]
     reals = (Constant(_OBS),)
     counts = (Constant(_COUNTS),)
+    props = (Constant(_PROPS),)
 
     cases = (("LogNormal(mean, sd) loglik", _meansd_loglik, [8.0, 2.0], reals),
         ("LogNormal(mean, var) loglik", _meanvar_loglik, [8.0, 4.0], reals),
@@ -135,7 +156,10 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         ("Gamma(rate, shape) loglik", _gamma_rateshape_loglik, [0.5, 3.0],
             reals),
         ("SkewNormal(centre, mass_below_centre, scale) loglik",
-            _skewnormal_loglik, [8.0, 0.3, 2.0], reals))
+            _skewnormal_loglik, [8.0, 0.3, 2.0], reals),
+        ("Beta(mean, sd) loglik", _beta_meansd_loglik, [0.3, 0.1], props),
+        ("InverseGaussian(mean, sd) loglik", _invgauss_meansd_loglik,
+            [3.0, 2.0], reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,

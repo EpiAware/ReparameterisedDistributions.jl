@@ -1,5 +1,30 @@
 ## Unreleased
 
+### `Beta(mean, sd)` and `InverseGaussian(mean, sd)`: two more analytical moments
+
+Registers `Beta(mean, sd)` (and `(mean, var)`), the natural coordinates for a
+probability-scale quantity elicited as a central value and an uncertainty — a
+reporting fraction or a case-fatality ratio, say — rather than the native
+shape pair. Writing `nu = mean * (1 - mean) / var - 1` for the concentration,
+`alpha = mean * nu` and `beta = (1 - mean) * nu` invert exactly. A Beta's
+variance is bounded above by `mean * (1 - mean)`, the variance of a Bernoulli
+with the same mean; a standard deviation elicited too wide for its mean has
+no Beta at all, and is rejected by the validity guard rather than silently
+clipped to the boundary.
+
+Also registers `InverseGaussian(mean, sd)` (and `(mean, var)`). The native
+`InverseGaussian(mu, lambda)` already takes the mean directly, so only the
+shape needs deriving: `lambda = mean^3 / var`. The family is a
+first-passage-time distribution (the hitting time of a drifting Wiener
+process), a genuine alternative to the Gamma and log-normal for a
+right-skewed delay such as an incubation period.
+
+Both closed forms keep the package's contract: exact algebra, no solver, and
+an explicit domain of validity rather than a silently nonsense distribution.
+`Weibull(mean, sd)` was considered and deferred (#39): its CV-to-shape
+relation has no elementary inverse, so it belongs to the numeric-fallback
+seam tracked separately (#41), not here.
+
 ### `rescale`: scale a registered moment while holding the others fixed
 
 `rescale(d, factor; parameter = :mean)` scales `d`'s named registered

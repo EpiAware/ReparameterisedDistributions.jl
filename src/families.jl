@@ -188,3 +188,66 @@ function _valid_moments(::Type{SkewNormal},
     centre, m, scale = vals
     return scale > 0 && 0 < m < 1
 end
+
+# Beta by mean and standard deviation, the natural coordinates for a
+# probability-scale quantity elicited as a central value and an uncertainty
+# (a reporting fraction or a case-fatality ratio, say) rather than as the
+# native shape pair. A Beta(alpha, beta) has
+#   mean = alpha / (alpha + beta),  var = mean * (1 - mean) / (nu + 1)
+# writing nu = alpha + beta for the concentration. So
+#   nu = mean * (1 - mean) / var - 1,
+#   alpha = mean * nu,  beta = (1 - mean) * nu.
+# `nu > 0` is exactly `var < mean * (1 - mean)`: the variance of any Beta is
+# bounded above by the variance of a Bernoulli with the same mean, so a
+# standard deviation elicited too wide for its mean has no Beta at all, not
+# merely an invalid one, and is rejected rather than silently clipped.
+function to_native(::Type{Beta}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    nu = mean * (1 - mean) / sd^2 - 1
+    return Beta(mean * nu, (1 - mean) * nu; check_args = false)
+end
+
+function _valid_moments(::Type{Beta}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    return 0 < mean < 1 && sd > 0 && sd^2 < mean * (1 - mean)
+end
+
+function to_native(::Type{Beta}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return to_native(Beta, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+function _valid_moments(::Type{Beta}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return 0 < mean < 1 && var > 0 && var < mean * (1 - mean)
+end
+
+# InverseGaussian by mean and standard deviation. The native
+# `InverseGaussian(mu, lambda)` is already keyed on the mean (`mu`), so only
+# the shape needs inverting: mean = mu and var = mu^3 / lambda give
+#   lambda = mean^3 / var,
+# an exact single-line inversion, unlike Gamma's, because the mean is native
+# here already. The family is a first-passage-time distribution (hitting
+# time of a drifting Wiener process), which makes it a genuine alternative to
+# the Gamma and log-normal for a right-skewed delay such as an incubation
+# period.
+function to_native(::Type{InverseGaussian}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    lambda = mean^3 / sd^2
+    return InverseGaussian(mean, lambda; check_args = false)
+end
+
+function _valid_moments(::Type{InverseGaussian}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    return mean > 0 && sd > 0
+end
+
+function to_native(::Type{InverseGaussian}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return to_native(InverseGaussian, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+function _valid_moments(::Type{InverseGaussian}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return mean > 0 && var > 0
+end
