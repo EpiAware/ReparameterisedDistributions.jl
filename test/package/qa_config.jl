@@ -43,5 +43,8 @@ const QA_CONFIG = (
     #      prefixes = ("MyPkg", "SomeTrigger"),
     #      expect_phantoms = false,    # true if a third party adds phantoms
     #      broken = false)             # true to quarantine a known ambiguity
-    extensions = ()
+    extensions = ((;
+        name = :ReparameterisedDistributionsComposedDistributionsExt,
+        triggers = ("ComposedDistributions",),
+        prefixes = ("ReparameterisedDistributions", "ComposedDistributions")),)
 )
