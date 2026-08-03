@@ -25,6 +25,17 @@ an explicit domain of validity rather than a silently nonsense distribution.
 relation has no elementary inverse, so it belongs to the numeric-fallback
 seam tracked separately (#41), not here.
 
+### ComposedDistributions interop: the moments are the leaf's parameters
+
+Loading `ComposedDistributions` registers `param_names` and `leaf_ctor` for `Reparameterised`, so a leaf built by `reparameterise` reports its registered moments — not the wrapped family's native parameters — as its estimable parameters everywhere ComposedDistributions reads them.
+`params_table` lists a `reparameterise(LogNormal; mean = ..., sd = ...)` leaf's rows as `mean`/`sd`, not `mu`/`sigma`.
+`uncertain(leaf; mean = prior)` attaches a prior to the mean, and `build_priors` picks it up there.
+`update` rebuilds a `Reparameterised` leaf (not a bare native distribution) from moment values, including through a `shared`/`tie` group.
+Placing a prior or a value on a native parameter of the wrapped family (`uncertain(leaf; sigma = prior)`, say) raises an `ArgumentError` naming the leaf's actual registered parameters, because that native parameter is not one of this leaf's parameters.
+
+The flat codec does not yet round-trip in moment coordinates: `flat_dimension`/`flatten`/`unflatten`/`reconstruct` read type-level companions of `param_names`/`leaf_ctor` that are not extensible from outside ComposedDistributions today (a `@generated`-function world-age constraint).
+The relevant assertions are `@test_broken` in the test suite, and [the gap is tracked upstream](https://github.com/EpiAware/ComposedDistributions.jl/issues/332).
+
 ### `rescale`: scale a registered moment while holding the others fixed
 
 `rescale(d, factor; parameter = :mean)` scales `d`'s named registered

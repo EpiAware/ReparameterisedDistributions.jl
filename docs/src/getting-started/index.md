@@ -105,6 +105,29 @@ parameters.
 Naming one that is not registered for `d`'s family raises a `DomainError`
 rather than applying the factor under different semantics.
 
+## Composing with ComposedDistributions
+
+Loading [ComposedDistributions](https://epiaware.github.io/ComposedDistributions.jl) lets a `reparameterise`d leaf sit inside a composed tree and be introspected in its registered moments, not the wrapped family's native parameters.
+
+```julia
+using ComposedDistributions
+
+tree = compose((delay = reparameterise(LogNormal; mean = 8.0, sd = 2.0),
+    tail = LogNormal(0.5, 0.4)))
+params_table(tree)   # lists `mean`/`sd` for `delay`, not `mu`/`sigma`
+
+est = uncertain(tree; delay = (mean = LogNormal(log(8.0), 0.2),))
+build_priors(params_table(est)).delay.mean   # the prior sits on the mean
+```
+
+A prior or a value on a native parameter of the wrapped family (`sigma`, here) is rejected: it is not one of this leaf's parameters.
+
+```julia
+uncertain(tree; delay = (sigma = LogNormal(0.0, 1.0),))   # ArgumentError
+```
+
+The flat codec (`flatten`/`unflatten`/`reconstruct`) does not yet round-trip in moment coordinates for a `Reparameterised` leaf; see [NEWS.md](https://github.com/EpiAware/ReparameterisedDistributions.jl/blob/main/NEWS.md) for the current status and the tracking issue.
+
 ## Learning more
 
 - Work through [Priors on moments](@ref priors-on-moments) to see what a
