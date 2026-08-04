@@ -19,6 +19,7 @@ const LIGHT_TUTORIALS = String[]
 # `ad = true`: the page itself is kit-managed (re-applied on every sync); only
 # this registration is package-owned.
 const HEAVY_TUTORIALS = String[
+    "priors-on-moments.jl",
     "ad-backends.jl"
 ]
 
@@ -31,6 +32,7 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 # `"# [Title](@id my-anchor)"`) so cross-references from other pages still
 # resolve in a fast build.
 const TUTORIAL_STUBS = Pair{String, String}[
+    "priors-on-moments.md" => "# [Priors on moments](@id priors-on-moments)",
     "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
 ]
 
@@ -73,12 +75,9 @@ const INDEX_REWRITES = Pair{String, String}[]
 # code; set `false` when they are illustrative (placeholder names) and must not
 # execute.
 #
-# `false` here: the package is unregistered, so the README's only code block is
-# the `Pkg.add(url = ...)` install snippet. Executing it during the docs build
-# installs the package from `main`, which is still the 2024 `AltDistributions`
-# scaffold, into the docs environment and renders that output onto the home
-# page. Revisit once there are real runnable examples to show (#19, #20).
-const README_EXECUTE = false
+# The install snippet is fenced `jl`, not `julia`, so it is not executed:
+# running `Pkg.add(url = ...)` would override the `[sources]` path entry.
+const README_EXECUTE = true
 
 # README headings whose whole section (heading + body, up to the next heading
 # of the same or a higher level) is dropped when generating the home page. The

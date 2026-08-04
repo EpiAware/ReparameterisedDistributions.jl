@@ -1,62 +1,58 @@
 # [Getting started](@id getting-started)
 
-Welcome to the `ReparameterisedDistributions` documentation.
-This page is the quickstart.
-The home page is generated from the README and already carries the install
-instructions, so start here with what a new user does once the package is
-loaded, and grow it into tutorials as the package develops.
+`reparameterise` wraps a Distributions.jl family so that its moments are its
+parameters.
+This page covers what the wrapper does, which parameterisations are
+registered, and how to rescale one.
 
-```julia
-using ReparameterisedDistributions
+```@example getting-started
+using ReparameterisedDistributions, Distributions
 ```
 
 ## A first example
 
-A delay is elicited as a mean and a standard deviation, and a prior belongs
-on the mean, not on a shape parameter that only implies one.
-`reparameterise` wraps a native family so that the moments are its
-parameters.
+A delay can be elicited as a mean and a standard deviation.
+A prior belongs on that mean, not on a shape parameter that only implies it.
+`reparameterise` wraps a native family so that the moments are its parameters.
 
 ```@example getting-started
-using ReparameterisedDistributions, Distributions
-
 d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 ```
 
-`params` reports the moments, not the native `(mu, sigma)` that only implies
-them, and every other method works exactly as it would on the native
-distribution.
+`params` reports the moments, not the native `(mu, sigma)`.
+Every other method works exactly as it would on the native distribution.
 
 ```@example getting-started
 params(d), mean(d), std(d), logpdf(d, 7.5)
 ```
 
-## Putting a prior on a moment
+The wrapper takes its variate form and value support from the family it wraps,
+so a wrapped discrete family stays discrete.
 
-The point of the wrapper: because the moments are the parameters, a model
-puts its priors directly on them and the sampler moves in moment
-coordinates, rather than in native parameters a prior cannot be elicited
-against.
+```@example getting-started
+nb = reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.5)
 
-```julia
-using Turing
-
-@model function delays(x)
-    m ~ LogNormal(2.0, 0.5)
-    s ~ truncated(Normal(2.0, 1.0); lower = 0.1)
-    for i in eachindex(x)
-        x[i] ~ reparameterise(LogNormal; mean = m, sd = s, check_args = false)
-    end
-end
+(mean(nb), var(nb))
 ```
 
-The chain comes back in `m` and `s`, not in native parameters that only
-imply them. `check_args = false` matters here: a sampler exploring an
-unconstrained parameter will propose an invalid point (a negative `s`, say),
-and turning the check off means an invalid proposal gives `logpdf == -Inf`
-rather than an exception raised mid-gradient. Every other method still
-converts, so an invalid distribution has no mean, no quantile and no draw —
-asking for one raises.
+## Invalid moments
+
+Constraining each moment on its own does not always keep the combination
+attainable.
+A `Beta` needs `sd^2 < mean * (1 - mean)`, so a positive mean and a positive
+standard deviation can still describe no `Beta` at all.
+`check_args = false` turns the constructor check off, so a proposal like that
+gives `logpdf == -Inf` rather than raising mid-gradient.
+
+```@example getting-started
+bad = reparameterise(Beta; mean = 0.2, sd = 0.5, check_args = false)
+
+logpdf(bad, 0.3)
+```
+
+Every other method still converts, so an invalid distribution has no mean, no
+quantile and no draw.
+Asking for one raises.
 
 ## Supported parameterisations
 
@@ -67,21 +63,52 @@ asking for one raises.
 | `Gamma` | `mean`, `sd` | `scale = var / mean`, `shape = mean² / var` |
 | `Gamma` | `mean`, `var` | as above, given the variance |
 | `Gamma` | `mean`, `shape` | `scale = mean / shape`; the shape is native |
+| `Gamma` | `shape`, `rate` | `scale = 1 / rate`; the shape is native |
 | `NegativeBinomial` | `mean`, `overdispersion` | `var = mean + overdispersion · mean²` |
+| `NegativeBinomial` | `mean`, `dispersion` | `var = mean + mean² / dispersion`, the reciprocal convention |
+| `Exponential` | `rate` | `scale = 1 / rate` |
+| `SkewNormal` | `centre`, `scale`, `mass_below_centre` | `alpha = tan(π · (1/2 − mass_below_centre))` |
 | `Beta` | `mean`, `sd` | `nu = mean·(1−mean)/var − 1`; `alpha = mean·nu`, `beta = (1−mean)·nu` |
 | `Beta` | `mean`, `var` | as above, given the variance |
 | `InverseGaussian` | `mean`, `sd` | `lambda = mean³ / var`; the mean is native |
 | `InverseGaussian` | `mean`, `var` | as above, given the variance |
 
-A wrapper takes its variate form and value support from the family it
-wraps, so the `NegativeBinomial` parameterisation stays **discrete**.
-Adding a family is one `to_native` method (the closed form) and one
-`_valid_moments` method (the guard), so a downstream package can register
-its own — see the [Public API](@ref public-api) and the Internal API page
-in the sidebar.
+Registering a family from another package is not supported yet: the
+conversion hook is public but the validity guard is still internal, so the
+contract is not one an external package can rely on. See
+[#80](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/80).
+
+The [Public API](@ref public-api) documents what is supported today.
+
+## Rescaling a moment
+
+`rescale(d, factor)` scales one of `d`'s registered moments by `factor`,
+holding the others fixed.
+It routes through whichever parameterisation `d` was built under.
+
+```@example getting-started
+g = reparameterise(Gamma; mean = 8.0, shape = 2.0)
+
+(mean(g), mean(rescale(g, 2.0)))
+```
+
+The shape stays at 2.0 and only the mean moves.
+A discrete family scales in moment coordinates rather than by an affine
+transform of the native support.
+
+```@example getting-started
+mean(rescale(nb, 3.0))
+```
+
+`parameter` defaults to `:mean` and can name any of `d`'s registered
+parameters.
+Naming one that is not registered for `d`'s family raises a `DomainError`
+rather than applying the factor under different semantics.
 
 ## Learning more
 
+- Work through [Priors on moments](@ref priors-on-moments) to see what a
+  prior on a moment implies in native coordinates, and how to fit one.
 - Want the full interface? See the [Public API](@ref public-api).
 - Want to report a problem or ask a question? Open an issue or start a
   discussion on the [GitHub repository](https://github.com/EpiAware/ReparameterisedDistributions.jl).
