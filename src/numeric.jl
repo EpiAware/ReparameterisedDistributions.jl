@@ -47,7 +47,8 @@ _primal(x::Real) = x
 @doc raw"
 
 Solve a family's own moment equation for a scalar `s`, exactly and
-differentiably, regardless of which solver backend runs the root-find.
+differentiably: the root is found numerically, but its derivative comes
+from the implicit-function-theorem correction rather than from the solve.
 
 A numeric family calls this inside its own [`to_native`](@ref) method,
 passing its own `residual`, `deriv` and `bracket` as ordinary functions —

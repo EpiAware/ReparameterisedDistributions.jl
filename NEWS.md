@@ -46,9 +46,10 @@ architecture, not merely a new family:
   pair is a plain method redefinition.
 - Roots.jl does the actual root-find, as a direct dependency rather than a
   package extension. Distributions.jl has hard-depended on Roots since
-  0.25.128, so naming it directly names an existing dependency rather than
-  adding one, for any environment able to load this package already. This
-  is an upstream coupling the package does not control.
+  0.25.128, so on any current resolve this names a package already present
+  rather than adding one. On Distributions below 0.25.128, which this
+  package's compat still admits, it is a new install. Either way it is an
+  upstream coupling the package does not control.
 - The gradient with respect to the moments stays exact regardless of how
   the root itself was found: two steps of an implicit-function-theorem
   correction recover the derivative afterwards from the residual equation
