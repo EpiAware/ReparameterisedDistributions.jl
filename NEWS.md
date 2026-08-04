@@ -69,9 +69,9 @@ architecture, not merely a new family:
   conversion, tracing into Roots' own internals, and are recorded as
   known-broken in the AD test registry pending the same fix.
 - Requesting a `(mean, sd)` outside the numerically solvable CV window —
-  roughly `1.3e-6` to `3e23` in Float64, far wider than any
-  epidemiologically meaningful delay — raises a `DomainError` naming the
-  attainable range under `check_args = true`, or gives `logpdf == -Inf`
+  roughly `2.6e-4` to `3e23` in Float64, far wider than any
+  epidemiologically meaningful delay — raises a `DomainError` under
+  `check_args = true`, or gives `logpdf == -Inf`
   (`pdf == 0`) under `check_args = false`, exactly as for an
   analytically-invalid moment. A solve that runs but does not converge to
   within tolerance raises rather than ever returning a distribution whose
