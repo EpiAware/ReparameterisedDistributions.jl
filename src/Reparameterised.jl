@@ -246,8 +246,14 @@ alongside its [`to_native`](@ref) method; the fallback accepts anything.
 - `vals`: the alternative parameter values, in `names` order.
 
 # Examples
+Register under the parameter names sorted alphabetically: `reparameterise`
+canonicalises its keywords that way before dispatching.
+
+`valid_moments` is public but not exported, so import it by name.
+
 ```@example
 using ReparameterisedDistributions, Distributions
+using ReparameterisedDistributions: valid_moments
 
 valid_moments(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
 ```

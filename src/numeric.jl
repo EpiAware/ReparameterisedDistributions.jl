@@ -75,13 +75,19 @@ off-diagonal.
 - `vals`: the alternative parameter values, in `names` order.
 
 # Examples
+The `to_native` method that calls this must be registered under the
+parameter names sorted alphabetically, as `reparameterise` canonicalises
+its keywords that way before dispatching.
+
+`solve_moment` is public but not exported, so import it by name.
+
 ```@example
 using ReparameterisedDistributions, Distributions
+using ReparameterisedDistributions: solve_moment
 
 # A toy equation, exp(s) = 2, solved for illustration; a real family's
-# residual is its own moment equation (see the `Weibull` registration in
-# src/families.jl for a worked example).
-s = solve_moment(Gamma, Val((:shape,)), (s, vals) -> exp(s) - vals[1],
+# residual is its own moment equation.
+solve_moment(Gamma, Val((:shape,)), (s, vals) -> exp(s) - vals[1],
     (s, vals) -> exp(s), pvals -> (-10.0, 10.0), (2.0,))
 ```
 

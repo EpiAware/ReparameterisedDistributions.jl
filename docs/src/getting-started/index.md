@@ -87,10 +87,12 @@ Registering a family, analytic or numeric, is the same two-hook contract:
 one `to_native` method (the conversion) and one `valid_moments` method (the
 guard). A family with no exact closed form calls `solve_moment` from
 inside its own `to_native`, passing its moment equation, its derivative
-and a bracket as ordinary functions — see the `Weibull` registration in
-`src/families.jl` for a worked example. Either way, a downstream package
-can register its own — see the [Public API](@ref public-api) and the
-Internal API page in the sidebar.
+and a bracket as ordinary functions.
+
+Register both methods under the parameter names sorted alphabetically:
+`reparameterise` canonicalises its keywords that way before dispatching, so
+a method registered under `Val((:sd, :mean))` is never found. The
+[Public API](@ref public-api) documents both hooks.
 
 ## Rescaling a moment
 
