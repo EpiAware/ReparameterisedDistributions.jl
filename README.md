@@ -27,131 +27,68 @@
 
 ## Getting started
 
-For the full walkthrough — every supported parameterisation, how to register
-a new one, and the AD backends it is checked against — see the
-[Getting started documentation](https://reparameteriseddistributions.epiaware.org/dev/getting-started/).
+See the
+[Getting started documentation](https://reparameteriseddistributions.epiaware.org/dev/getting-started/)
+for every supported parameterisation, how to register a new one, and the AD
+backends this package is checked against.
 
-The package is not yet registered. Install it from the repository:
+The package is not yet registered.
+Install it from the repository:
 
-```julia
+```jl
 using Pkg
 Pkg.add(url = "https://github.com/EpiAware/ReparameterisedDistributions.jl")
 ```
 
-`reparameterise` returns a distribution whose parameters *are* the moments:
+`reparameterise` returns a distribution whose parameters *are* the moments, so
+a prior goes on the mean rather than on a shape that only implies one.
 
 ```julia
-using ReparameterisedDistributions, Distributions
+using ReparameterisedDistributions, Distributions, Turing, Random
 
-d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+Random.seed!(1)
 
-params(d)      # (8.0, 2.0) — the moments, not the native (mu, sigma)
-mean(d)        # 8.0
-std(d)         # 2.0
-logpdf(d, 7.5)
-```
+truth = reparameterise(Gamma; mean = 8.0, sd = 3.0)
+y = rand(truth, 200)
 
-It is an ordinary `Distribution`, so it evaluates and samples exactly as the
-native one does, and it goes on the right of a `~`. Because the moments are the
-parameters, a model puts its priors on them and the sampler moves in moment
-coordinates:
-
-```julia
-using Turing
-
-@model function delays(x)
-    m ~ LogNormal(2.0, 0.5)
-    s ~ truncated(Normal(2.0, 1.0); lower = 0.1)
-    for i in eachindex(x)
-        x[i] ~ reparameterise(LogNormal; mean = m, sd = s, check_args = false)
-    end
+@model function delay(y)
+    delay_mean ~ truncated(Normal(8.0, 4.0); lower = 0.0)
+    delay_sd ~ truncated(Normal(3.0, 2.0); lower = 0.0)
+    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd,
+        check_args = false)
 end
+
+chain = sample(delay(y), NUTS(), 500; progress = false)
 ```
 
-The chain comes back in `m` and `s` — a mean and a standard deviation — rather
-than in native parameters that only imply them. The conversion is exact algebra,
-so it is differentiable and the gradient with respect to the moments is exact.
-The package is tested against ForwardDiff, ReverseDiff, Enzyme (forward and
-reverse) and Mooncake (forward and reverse).
-
-## Supported parameterisations
-
-| Family | Parameters | Conversion |
-|---|---|---|
-| `LogNormal` | `mean`, `sd` | the moments of the distribution, not of its logarithm |
-| `LogNormal` | `mean`, `var` | as above, given the variance |
-| `Gamma` | `mean`, `sd` | `scale = var / mean`, `shape = mean² / var` |
-| `Gamma` | `mean`, `var` | as above, given the variance |
-| `Gamma` | `mean`, `shape` | `scale = mean / shape`; the shape is native |
-| `Gamma` | `shape`, `rate` | `scale = 1 / rate`; the shape is native |
-| `NegativeBinomial` | `mean`, `overdispersion` | `var = mean + overdispersion · mean²` |
-| `NegativeBinomial` | `mean`, `dispersion` | `var = mean + mean² / dispersion`, the reciprocal convention |
-| `Exponential` | `rate` | `scale = 1 / rate` |
-| `SkewNormal` | `centre`, `scale`, `mass_below_centre` | `alpha = tan(π · (1/2 − mass_below_centre))` |
-| `Beta` | `mean`, `sd` | `nu = mean·(1−mean)/var − 1`; `alpha = mean·nu`, `beta = (1−mean)·nu` |
-| `Beta` | `mean`, `var` | as above, given the variance |
-| `InverseGaussian` | `mean`, `sd` | `lambda = mean³ / var`; the mean is native |
-| `InverseGaussian` | `mean`, `var` | as above, given the variance |
-
-The `NegativeBinomial` parameterisations are the two epidemiology reaches for:
-the overdispersion is the excess variance relative to a Poisson, so it tends to
-the Poisson limit as it goes to zero; the dispersion is its reciprocal
-(`dispersion = 1 / overdispersion`), so it tends to the Poisson limit as it
-goes to infinity instead. The wrapper stays **discrete** — its value support is
-taken from the family it wraps.
-
-The `Exponential` and `Gamma` rate parameterisations let a distribution be
-specified, reported and estimated directly by its rate rather than by a scale
-hand-inverted from it — the natural coordinates for a hazard.
-
-The `SkewNormal` parameterisation is keyed on an elicitation quantity rather
-than a moment: the probability mass falling below a reference point. That
-mass depends only on the native shape for the untruncated family, so it
-inverts exactly; the docstring notes that the elicited fraction is exact only
-before any truncation. Distributions.jl does not implement `cdf`/`quantile`
-for `SkewNormal` (Owen's T function is not implemented there), a limitation
-this parameterisation inherits rather than works around.
-
-`Beta(mean, sd)` is the natural coordinates for a probability-scale quantity
-elicited as a central value and an uncertainty — a reporting fraction or a
-case-fatality ratio, say. A Beta's variance cannot exceed `mean * (1 - mean)`,
-the variance of a Bernoulli with the same mean; a standard deviation too wide
-for its mean has no Beta at all, and the validity guard rejects it rather than
-silently clipping it to the boundary.
-
-`InverseGaussian(mean, sd)` reparameterises the one family here whose native
-form already takes the mean directly (`InverseGaussian(mu, lambda)`), so only
-the shape needs deriving: `lambda = mean^3 / var`. The family is a
-first-passage-time distribution — the hitting time of a drifting Wiener
-process — which makes it a genuine alternative to the Gamma and log-normal
-for a right-skewed delay such as an incubation period.
-
-Adding a family is one `to_native` method (the closed form) and one
-`_valid_moments` method (the guard), so a downstream package can register its
-own.
-
-## Rescaling a moment
-
-`rescale(d, factor)` scales one of `d`'s registered moments by `factor`,
-holding the others fixed, routing through whichever parameterisation `d` was
-built under:
+The chain comes back in a mean and a standard deviation, the coordinates the
+delay was elicited in, rather than in native parameters that only imply them.
 
 ```julia
-using ReparameterisedDistributions, Distributions
+using CairoMakie, AlgebraOfGraphics, DataFramesMeta
 
-d = reparameterise(Gamma; mean = 8.0, shape = 2.0)
-mean(rescale(d, 2.0))                      # 16.0 — shape stays at 2.0
+CairoMakie.activate!(type = "png", px_per_unit = 2)
 
-nb = reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.5)
-mean(rescale(nb, 3.0))                     # 30.0 — a discrete family, scaled
-                                            # in moment coordinates rather than
-                                            # by an affine transform of the
-                                            # native support
+draws = DataFrame(
+    value = vcat(vec(chain[:delay_mean]), vec(chain[:delay_sd])),
+    moment = vcat(fill("mean", length(chain[:delay_mean])),
+        fill("sd", length(chain[:delay_sd])))
+)
+actual = DataFrame(moment = ["mean", "sd"], value = [8.0, 3.0])
+
+draw(
+    data(draws) * mapping(:value, layout = :moment) *
+    AlgebraOfGraphics.density() * visual(Lines, linewidth = 2) +
+    data(actual) * mapping(:value, layout = :moment) *
+    visual(VLines, color = :black, linestyle = :dash);
+    facet = (; linkxaxes = :none)
+)
 ```
 
-`parameter` defaults to `:mean` and can name any of `d`'s registered
-parameters; naming one that is not registered for `d`'s family raises a
-`DomainError` rather than applying the factor under different semantics.
+The conversion is exact algebra, so it is differentiable and the gradient with
+respect to the moments is exact.
+The package is tested against ForwardDiff, ReverseDiff, Enzyme and Mooncake, in
+both forward and reverse mode.
 
 ## Related packages
 

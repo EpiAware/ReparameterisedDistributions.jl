@@ -19,6 +19,7 @@ const LIGHT_TUTORIALS = String[]
 # `ad = true`: the page itself is kit-managed (re-applied on every sync); only
 # this registration is package-owned.
 const HEAVY_TUTORIALS = String[
+    "priors-on-moments.jl",
     "ad-backends.jl"
 ]
 
@@ -31,6 +32,7 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 # `"# [Title](@id my-anchor)"`) so cross-references from other pages still
 # resolve in a fast build.
 const TUTORIAL_STUBS = Pair{String, String}[
+    "priors-on-moments.md" => "# [Priors on moments](@id priors-on-moments)",
     "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
 ]
 
@@ -73,12 +75,14 @@ const INDEX_REWRITES = Pair{String, String}[]
 # code; set `false` when they are illustrative (placeholder names) and must not
 # execute.
 #
-# `false` here: the package is unregistered, so the README's only code block is
-# the `Pkg.add(url = ...)` install snippet. Executing it during the docs build
-# installs the package from `main`, which is still the 2024 `AltDistributions`
-# scaffold, into the docs environment and renders that output onto the home
-# page. Revisit once there are real runnable examples to show (#19, #20).
-const README_EXECUTE = false
+# `true`, matching the rest of the org: the README now carries a real worked
+# example, and running it on the home page is what makes the figure render
+# there. The one block that must not run is the `Pkg.add(url = ...)` install
+# snippet, since executing it would pull the package from `main` over the
+# `[sources]` path entry this environment resolves it by. That block is fenced
+# as `jl` rather than `julia`, which the managed build leaves alone: only a
+# fence opening exactly ```` ```julia ```` becomes an `@example readme` block.
+const README_EXECUTE = true
 
 # README headings whose whole section (heading + body, up to the next heading
 # of the same or a higher level) is dropped when generating the home page. The
