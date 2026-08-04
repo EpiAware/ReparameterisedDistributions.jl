@@ -69,7 +69,7 @@ priors = vcat(
 draw(
     data(@rsubset(priors, :mean < 40)) *
     mapping(:mean, color = :source) *
-    AlgebraOfGraphics.density() * visual(Lines, linewidth = 2)
+    AlgebraOfGraphics.density()
 )
 
 # The implied prior is skewed, wider, and puts real mass on means the modeller
@@ -123,7 +123,7 @@ actual = DataFrame(moment = ["mean", "sd"], value = [8.0, 3.0])
 
 draw(
     data(draws) * mapping(:value, layout = :moment) *
-    AlgebraOfGraphics.density() * visual(Lines, linewidth = 2) +
+    AlgebraOfGraphics.density() +
     data(actual) * mapping(:value, layout = :moment) *
     visual(VLines, color = :black, linestyle = :dash);
     facet = (; linkxaxes = :none)

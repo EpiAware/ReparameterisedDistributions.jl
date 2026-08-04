@@ -78,7 +78,7 @@ actual = DataFrame(moment = ["mean", "sd"], value = [8.0, 3.0])
 
 draw(
     data(draws) * mapping(:value, layout = :moment) *
-    AlgebraOfGraphics.density() * visual(Lines, linewidth = 2) +
+    AlgebraOfGraphics.density() +
     data(actual) * mapping(:value, layout = :moment) *
     visual(VLines, color = :black, linestyle = :dash);
     facet = (; linkxaxes = :none)
