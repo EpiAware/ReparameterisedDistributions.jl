@@ -15,29 +15,24 @@
 ## Why ReparameterisedDistributions?
 
 - A delay can be elicited as a mean and a standard deviation, but
-  names each family by its native parameters, so the coordinates a modeller
-  reasons in are not the ones they have to supply.
-- Independent priors on shape and scale do not compose into a prior on the
-  mean, so a prior on a moment cannot be expressed through a native leaf at
-  all.
+  Distributions.jl names each family by its native parameters, so those are
+  not the coordinates a model has to be written in.
+- Independent priors on a shape and a scale imply a prior on the mean that
+  was never chosen, and is usually not the one that was meant.
 - `reparameterise` makes the moments a distribution's parameters, so a prior
-  lands on the mean rather than on a shape parameter that merely implies one.
-- Conversion to the native distribution runs through an exact closed form and
-  stays differentiable, so the moments can be sampled directly inside a model.
+  can be put on the mean directly.
+- The wrapper is an ordinary `Distribution` and stays differentiable, so the
+  moments can be sampled directly inside a model.
 
 ## Getting started
 
 See the
 [Getting started documentation](https://reparameteriseddistributions.epiaware.org/dev/getting-started/)
-for every supported parameterisation, how to register a new one, and the AD
-backends this package is checked against.
-
-The package is not yet registered.
-Install it from the repository:
+for every supported parameterisation.
 
 ```jl
 using Pkg
-Pkg.add(url = "https://github.com/EpiAware/ReparameterisedDistributions.jl")
+Pkg.add("ReparameterisedDistributions")
 ```
 
 `reparameterise` returns a distribution whose parameters *are* the moments, so
@@ -54,11 +49,12 @@ y = rand(truth, 200)
 @model function delay(y)
     delay_mean ~ truncated(Normal(8.0, 4.0); lower = 0.0)
     delay_sd ~ truncated(Normal(3.0, 2.0); lower = 0.0)
-    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd,
-        check_args = false)
+    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd)
 end
 
 chain = sample(delay(y), NUTS(), 500; progress = false)
+
+summarystats(chain)
 ```
 
 The chain comes back in a mean and a standard deviation, the coordinates the
@@ -84,11 +80,6 @@ draw(
     facet = (; linkxaxes = :none)
 )
 ```
-
-The conversion is exact algebra, so it is differentiable and the gradient with
-respect to the moments is exact.
-The package is tested against ForwardDiff, ReverseDiff, Enzyme and Mooncake, in
-both forward and reverse mode.
 
 ## Related packages
 

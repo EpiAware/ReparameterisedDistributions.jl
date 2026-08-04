@@ -1,10 +1,9 @@
 # [Getting started](@id getting-started)
 
-Welcome to the `ReparameterisedDistributions` documentation.
-This page is the quickstart.
-The home page is generated from the README and already carries the install
-instructions and a worked fit, so this page picks up from there: what the
-wrapper does, which parameterisations exist, and how to move between them.
+`reparameterise` wraps a Distributions.jl family so that its moments are its
+parameters.
+This page covers what the wrapper does, which parameterisations are
+registered, and how to rescale one.
 
 ```@example getting-started
 using ReparameterisedDistributions, Distributions
@@ -20,8 +19,7 @@ A prior belongs on that mean, not on a shape parameter that only implies it.
 d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 ```
 
-`params` reports the moments, not the native `(mu, sigma)` that only implies
-them.
+`params` reports the moments, not the native `(mu, sigma)`.
 Every other method works exactly as it would on the native distribution.
 
 ```@example getting-started
@@ -39,15 +37,17 @@ nb = reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.5)
 
 ## Invalid moments
 
-A sampler exploring an unconstrained space will propose moments no member of
-the family can have.
-`check_args = false` turns the constructor check off, so an invalid proposal
+Constraining each moment on its own does not always keep the combination
+attainable.
+A `Beta` needs `sd^2 < mean * (1 - mean)`, so a positive mean and a positive
+standard deviation can still describe no `Beta` at all.
+`check_args = false` turns the constructor check off, so a proposal like that
 gives `logpdf == -Inf` rather than raising mid-gradient.
 
 ```@example getting-started
-bad = reparameterise(Gamma; mean = 1.0, sd = -1.0, check_args = false)
+bad = reparameterise(Beta; mean = 0.2, sd = 0.5, check_args = false)
 
-logpdf(bad, 2.0)
+logpdf(bad, 0.3)
 ```
 
 Every other method still converts, so an invalid distribution has no mean, no
@@ -73,35 +73,12 @@ Asking for one raises.
 | `InverseGaussian` | `mean`, `sd` | `lambda = mean³ / var`; the mean is native |
 | `InverseGaussian` | `mean`, `var` | as above, given the variance |
 
-The `NegativeBinomial` parameterisations are the two epidemiology reaches for.
-The overdispersion is the excess variance relative to a Poisson, so it tends to
-the Poisson limit as it goes to zero.
-The dispersion is its reciprocal, so it tends to the Poisson limit as it goes
-to infinity instead.
+Registering a family from another package is not supported yet: the
+conversion hook is public but the validity guard is still internal, so the
+contract is not one an external package can rely on. See
+[#80](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/80).
 
-The `Exponential` and `Gamma` rate parameterisations let a distribution be
-specified, reported and estimated directly by its rate rather than by a scale
-hand-inverted from it.
-
-The `SkewNormal` parameterisation is keyed on an elicitation quantity rather
-than a moment, the probability mass falling below a reference point.
-That mass depends only on the native shape for the untruncated family, so it
-inverts exactly, and the elicited fraction is exact only before any truncation.
-Distributions.jl does not implement `cdf` or `quantile` for `SkewNormal`, a
-limitation this parameterisation inherits rather than works around.
-
-`Beta(mean, sd)` is the natural coordinates for a probability-scale quantity
-elicited as a central value and an uncertainty, such as a reporting fraction
-or a case-fatality ratio.
-A Beta's variance cannot exceed `mean * (1 - mean)`, the variance of a
-Bernoulli with the same mean.
-A standard deviation too wide for its mean has no Beta at all, and the validity
-guard rejects it rather than silently clipping it to the boundary.
-
-Adding a family is one `to_native` method for the closed form and one
-`_valid_moments` method for the guard, so a downstream package can register its
-own.
-See the [Public API](@ref public-api) and the Internal API page in the sidebar.
+The [Public API](@ref public-api) documents what is supported today.
 
 ## Rescaling a moment
 
@@ -115,7 +92,7 @@ g = reparameterise(Gamma; mean = 8.0, shape = 2.0)
 (mean(g), mean(rescale(g, 2.0)))
 ```
 
-The shape stays where it was; only the named moment moves.
+The shape stays at 2.0 and only the mean moves.
 A discrete family scales in moment coordinates rather than by an affine
 transform of the native support.
 
@@ -130,8 +107,8 @@ rather than applying the factor under different semantics.
 
 ## Learning more
 
-- Work through [Priors on moments](@ref priors-on-moments) to see why a prior
-  on a mean cannot be written with native parameters, and how to fit one.
+- Work through [Priors on moments](@ref priors-on-moments) to see what a
+  prior on a moment implies in native coordinates, and how to fit one.
 - Want the full interface? See the [Public API](@ref public-api).
 - Want to report a problem or ask a question? Open an issue or start a
   discussion on the [GitHub repository](https://github.com/EpiAware/ReparameterisedDistributions.jl).

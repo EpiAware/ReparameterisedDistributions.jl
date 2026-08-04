@@ -75,13 +75,8 @@ const INDEX_REWRITES = Pair{String, String}[]
 # code; set `false` when they are illustrative (placeholder names) and must not
 # execute.
 #
-# `true`, matching the rest of the org: the README now carries a real worked
-# example, and running it on the home page is what makes the figure render
-# there. The one block that must not run is the `Pkg.add(url = ...)` install
-# snippet, since executing it would pull the package from `main` over the
-# `[sources]` path entry this environment resolves it by. That block is fenced
-# as `jl` rather than `julia`, which the managed build leaves alone: only a
-# fence opening exactly ```` ```julia ```` becomes an `@example readme` block.
+# The install snippet is fenced `jl`, not `julia`, so it is not executed:
+# running `Pkg.add(url = ...)` would override the `[sources]` path entry.
 const README_EXECUTE = true
 
 # README headings whose whole section (heading + body, up to the next heading

@@ -2,13 +2,14 @@
 #
 # ## Introduction
 #
-# A delay can be elicited as a mean and a standard deviation.
-# Distributions.jl names a `Gamma` by its shape and scale, so the coordinates
-# the elicitation arrives in are not the ones the model has to be written in.
-# The usual workaround is to put independent priors on the native parameters
-# and take whatever prior on the mean they imply.
-# This tutorial shows what that implied prior looks like, and how
-# [`reparameterise`](@ref) lets the prior be specified directly instead.
+# A delay can be elicited as a mean and a standard deviation, and you may
+# want to put the prior straight onto those.
+# Distributions.jl names a `Gamma` by its shape and scale, so doing that means
+# either choosing priors for parameters you have no belief about, or writing
+# the transform yourself.
+# This tutorial shows what independent priors on the native parameters imply
+# about the mean, and how [`reparameterise`](@ref) lets the prior be put on the
+# mean directly.
 #
 # ### What are we going to do in this exercise
 #
@@ -45,22 +46,35 @@ Random.seed!(1)
 shape_prior = truncated(Normal(2.0, 1.0); lower = 0.0)
 scale_prior = truncated(Normal(4.0, 2.0); lower = 0.0)
 
-# The mean of a Gamma is the product of its shape and scale.
-# So the prior on the mean is the pushforward of that product.
+# Each draw from those priors is a `Gamma`, and `mean` reads off the mean it
+# implies.
 
 n = 20_000
-implied_mean = rand(shape_prior, n) .* rand(scale_prior, n)
+native = [Gamma(rand(shape_prior), rand(scale_prior)) for _ in 1:n]
+implied_mean = mean.(native)
 
-# We can instead specify the prior on the mean directly, which is what
-# `reparameterise` makes usable inside a model.
+# `reparameterise` builds the same family from a mean and a standard
+# deviation, so the prior can be put on the mean itself.
 
 mean_prior = truncated(Normal(8.0, 3.0); lower = 0.0)
-direct_mean = rand(mean_prior, n)
+sd_prior = truncated(Normal(3.0, 1.0); lower = 0.0)
+
+moments = [reparameterise(Gamma; mean = rand(mean_prior), sd = rand(sd_prior))
+           for _ in 1:n]
+direct_mean = mean.(moments)
+
+# Both branches call `mean` on a `Gamma`; only the coordinates the prior was
+# written in differ.
+# In the second, `mean` returns the value that was asked for.
+
+d = reparameterise(Gamma; mean = 8.0, sd = 3.0)
+
+(mean(d), std(d))
 
 # Plotted together, the two priors on the mean differ.
 
 priors = vcat(
-    DataFrame(mean = implied_mean, source = "implied by shape × scale"),
+    DataFrame(mean = implied_mean, source = "implied by shape and scale"),
     DataFrame(mean = direct_mean, source = "prior on the mean")
 )
 
@@ -72,60 +86,66 @@ draw(
 
 # The implied prior is skewed and wider, and puts mass on means outside the
 # elicited belief.
-#
-# Tuning the native priors cannot fix this.
-# Independent priors on shape and scale never compose into an arbitrary prior
-# on the mean, because the mean is a product of the two.
+# It can be brought closer by tuning the native priors, but only indirectly:
+# the mean is a product of the two, so it is not something either prior sets
+# on its own.
 
-# ## Writing the model in moment coordinates
+# ## Fitting both parameterisations
 #
-# `reparameterise` returns a distribution whose parameters are the moments.
+# The same data, fitted twice: once in native coordinates, once in moment
+# coordinates.
 # The delay below has a mean of 8 days and a standard deviation of 3.
 
 truth = reparameterise(Gamma; mean = 8.0, sd = 3.0)
 y = rand(truth, 300)
 
-@model function delay(y)
-    delay_mean ~ truncated(Normal(8.0, 3.0); lower = 0.0)
-    delay_sd ~ truncated(Normal(3.0, 2.0); lower = 0.0)
-    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd,
-        check_args = false)
+@model function native_model(y)
+    shape ~ shape_prior
+    scale ~ scale_prior
+    y .~ Gamma(shape, scale)
 end
 
-# `check_args = false` matters inside a model.
-# A sampler exploring an unconstrained space will propose a negative standard
-# deviation, and turning the check off means that proposal scores `-Inf`
-# instead of raising part-way through a gradient evaluation.
+@model function moment_model(y)
+    delay_mean ~ mean_prior
+    delay_sd ~ sd_prior
+    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd)
+end
 
-chain = sample(delay(y), NUTS(), 1000; progress = false)
+native_chain = sample(native_model(y), NUTS(), 1000; progress = false)
+moment_chain = sample(moment_model(y), NUTS(), 1000; progress = false)
 
 # ## Reading the posterior
 #
-# The chain comes back in the coordinates the delay was elicited in, so the
-# summary is directly comparable to the prior.
+# The moment fit reports the mean directly.
 
-summarystats(chain)
+summarystats(moment_chain)
 
-# Plotted against the values the data were generated from, both moments are
-# recovered.
+# The native fit reports a shape and a scale, so a posterior for the mean has
+# to be reconstructed from the draws.
 
-draws = vcat(
-    DataFrame(value = vec(chain[:delay_mean]), moment = "mean"),
-    DataFrame(value = vec(chain[:delay_sd]), moment = "sd")
+native_mean = vec(native_chain[:shape]) .* vec(native_chain[:scale])
+
+# That transform is one line for a `Gamma` and a different line for every
+# other family, has to be redone for the standard deviation, and is applied
+# to the wrong thing without complaint if it is wrong.
+# It is also only half the problem: the prior in that fit was still the
+# implied one plotted above, not the belief about the mean.
+
+posteriors = vcat(
+    DataFrame(mean = native_mean, fit = "native, transformed"),
+    DataFrame(mean = vec(moment_chain[:delay_mean]), fit = "moment")
 )
-actual = DataFrame(moment = ["mean", "sd"], value = [8.0, 3.0])
 
 draw(
-    data(draws) * mapping(:value, layout = :moment) *
+    data(posteriors) * mapping(:mean, color = :fit) *
     AlgebraOfGraphics.density() +
-    data(actual) * mapping(:value, layout = :moment) *
-    visual(VLines, color = :black, linestyle = :dash);
-    facet = (; linkxaxes = :none)
+    data(DataFrame(mean = [8.0])) * mapping(:mean) *
+    visual(VLines, color = :black, linestyle = :dash)
 )
 
-# The conversion from moments to native parameters is exact algebra rather
-# than a numerical solve, so the model stays differentiable and the gradient
-# with respect to the mean and the standard deviation is exact.
+# Both recover the mean, because 300 observations swamp the prior.
+# The difference is what each model let you say beforehand, and what each
+# chain hands back without further work.
 
 # ## What to do next
 #
