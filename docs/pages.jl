@@ -28,5 +28,6 @@ pages = [
         "Public API" => "lib/public.md",
         "Internal API" => "lib/internals.md"
     ],
-    "Benchmarks" => "benchmarks.md"
+    "Benchmarks" => "benchmarks.md",
+    "Release notes" => "release-notes.md"
 ]
