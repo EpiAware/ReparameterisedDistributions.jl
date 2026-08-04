@@ -14,7 +14,7 @@
 
 ## Why ReparameterisedDistributions?
 
-- A delay is elicited as a mean and a standard deviation, but Distributions.jl
+- A delay can be elicited as a mean and a standard deviation, but
   names each family by its native parameters, so the coordinates a modeller
   reasons in are not the ones they have to supply.
 - Independent priors on shape and scale do not compose into a prior on the

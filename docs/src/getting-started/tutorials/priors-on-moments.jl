@@ -2,7 +2,7 @@
 #
 # ## Introduction
 #
-# A delay is elicited as a mean and a standard deviation.
+# A delay can be elicited as a mean and a standard deviation.
 # Distributions.jl names a `Gamma` by its shape and scale, so the coordinates
 # the elicitation arrives in are not the ones the model has to be written in.
 # The usual workaround is to put independent priors on the native parameters

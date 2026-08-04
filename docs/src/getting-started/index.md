@@ -12,7 +12,7 @@ using ReparameterisedDistributions, Distributions
 
 ## A first example
 
-A delay is elicited as a mean and a standard deviation.
+A delay can be elicited as a mean and a standard deviation.
 A prior belongs on that mean, not on a shape parameter that only implies it.
 `reparameterise` wraps a native family so that the moments are its parameters.
 
