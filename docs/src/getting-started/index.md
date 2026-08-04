@@ -83,16 +83,17 @@ The gradient is still exact: the root's derivative is recovered afterwards by
 an implicit-function-theorem correction rather than by differentiating through
 the solver.
 
-Registering a family, analytic or numeric, is the same two-hook contract:
-one `to_native` method (the conversion) and one `valid_moments` method (the
-guard). A family with no exact closed form calls `solve_moment` from
-inside its own `to_native`, passing its moment equation, its derivative
-and a bracket as ordinary functions.
+Registering a family, analytic or numeric, needs exactly one `to_native`
+method: the conversion, guarding its own validity first and returning
+`nothing` for a value its parameters cannot describe. A family with no exact
+closed form calls `solve_moment` from inside its own `to_native`, passing
+its moment equation, its derivative and a bracket as ordinary functions,
+after the same guard.
 
-Register both methods under the parameter names sorted alphabetically:
+Register the method under the parameter names sorted alphabetically:
 `reparameterise` canonicalises its keywords that way before dispatching, so
 a method registered under `Val((:sd, :mean))` is never found. The
-[Public API](@ref public-api) documents both hooks.
+[Public API](@ref public-api) documents the hook.
 
 ## Rescaling a moment
 
