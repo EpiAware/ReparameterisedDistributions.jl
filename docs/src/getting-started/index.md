@@ -52,7 +52,7 @@ logpdf(bad, 2.0)
 
 Every other method still converts, so an invalid distribution has no mean, no
 quantile and no draw.
-Asking for one raises rather than returning a number that means nothing.
+Asking for one raises.
 
 ## Supported parameterisations
 
@@ -81,7 +81,7 @@ to infinity instead.
 
 The `Exponential` and `Gamma` rate parameterisations let a distribution be
 specified, reported and estimated directly by its rate rather than by a scale
-hand-inverted from it, the natural coordinates for a hazard.
+hand-inverted from it.
 
 The `SkewNormal` parameterisation is keyed on an elicitation quantity rather
 than a moment, the probability mass falling below a reference point.
@@ -91,8 +91,8 @@ Distributions.jl does not implement `cdf` or `quantile` for `SkewNormal`, a
 limitation this parameterisation inherits rather than works around.
 
 `Beta(mean, sd)` is the natural coordinates for a probability-scale quantity
-elicited as a central value and an uncertainty, a reporting fraction or a
-case-fatality ratio say.
+elicited as a central value and an uncertainty, such as a reporting fraction
+or a case-fatality ratio.
 A Beta's variance cannot exceed `mean * (1 - mean)`, the variance of a
 Bernoulli with the same mean.
 A standard deviation too wide for its mean has no Beta at all, and the validity

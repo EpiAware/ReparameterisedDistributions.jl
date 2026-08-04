@@ -47,8 +47,7 @@ shape_prior = truncated(Normal(2.0, 1.0); lower = 0.0)
 scale_prior = truncated(Normal(4.0, 2.0); lower = 0.0)
 
 # The mean of a Gamma is the product of its shape and scale.
-# So the prior on the mean is the pushforward of that product, which nobody
-# chose and nobody looked at.
+# So the prior on the mean is the pushforward of that product.
 
 n = 20_000
 implied_mean = rand(shape_prior, n) .* rand(scale_prior, n)
@@ -74,8 +73,6 @@ draw(
 
 # The implied prior is skewed, wider, and puts real mass on means the modeller
 # would have ruled out.
-# It is not wrong so much as unchosen: it is whatever the product of two other
-# beliefs happened to be.
 #
 # The two priors also cannot be reconciled by tuning the native ones.
 # Independent priors on shape and scale never compose into an arbitrary prior
