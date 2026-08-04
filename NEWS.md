@@ -44,12 +44,9 @@ architecture, not merely a new family:
   is registered" fallback, so ordinary dispatch reaches it whenever one is
   registered, and registering a closed form later for a currently-numeric
   pair is a plain method redefinition.
-- The actual root-find lives in a new package extension,
-  `ReparameterisedDistributionsRootsExt` (Roots.jl), kept out of the core
-  package per the maintainer's ruling that this package owns the equation
-  and the derivative rule but not a solver. Distributions.jl itself
-  depends on Roots, so the extension loads for essentially every user
-  without a new install.
+- Roots.jl does the actual root-find, as a direct dependency rather than a package extension.
+  Distributions.jl has hard-depended on Roots since 0.25.128, so naming it directly names an existing dependency rather than adding one, for any environment able to load this package already.
+  This is an upstream coupling the package does not control.
 - The gradient with respect to the moments stays exact regardless of how
   the root itself was found: two steps of an implicit-function-theorem
   correction recover the derivative afterwards from the residual equation
@@ -65,10 +62,9 @@ architecture, not merely a new family:
   practice: `Roots.A42` is not always reliable in `Dual` arithmetic
   (measured directly against this package's own equation, surfaced by an
   end-to-end Turing/NUTS run rather than a synthetic case).
-  Enzyme and Mooncake are not yet given the same treatment; both currently
-  fail (loudly, not silently) when differentiating the numeric
-  conversion, tracing into Roots' own internals, and are recorded as
-  known-broken in the AD test registry pending the same fix.
+- Enzyme (forward and reverse) and Mooncake (forward and reverse) also differentiate the numeric conversion correctly, via two further package extensions, `ReparameterisedDistributionsEnzymeCoreExt` and `ReparameterisedDistributionsMooncakeExt`.
+  Both backends trace into Roots' own bisection internals and cannot get past a float/integer bitcast in its midpoint step, so each extension marks the solve itself inactive for its backend and lets the implicit-function-theorem correction above supply the real derivative instead, exactly as it already does for ForwardDiff and ReverseDiff.
+  All six backends the AD test harness covers are measured correct against central differences.
 - Requesting a `(mean, sd)` outside the numerically solvable CV window —
   roughly `2.6e-4` to `3e23` in Float64, far wider than any
   epidemiologically meaningful delay — raises a `DomainError` under
