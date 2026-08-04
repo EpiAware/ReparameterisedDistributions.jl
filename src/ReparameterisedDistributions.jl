@@ -36,15 +36,19 @@ using Random: AbstractRNG
 # centralised here per the kit's import-centralisation gate).
 using DocStringExtensions: @template, DOCSTRING, EXPORTS, IMPORTS, TYPEDEF,
                            TYPEDFIELDS, TYPEDSIGNATURES
+# The Weibull numeric conversion's own mathematics (src/families.jl):
+# already in this package's dependency closure through Distributions, so
+# this costs no new install and no new transitive package.
+using SpecialFunctions: digamma, loggamma
 
 # Functions we extend for the wrapper.
 import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,
                       logccdf, quantile, mean, var, sampler, mode, modes,
-                      skewness, kurtosis, entropy, mgf, cf
+                      skewness, kurtosis, entropy, mgf, cf, loglikelihood
 # Types and constructors we use without extending.
 using Distributions: Distributions, Distribution, Beta, Exponential, Gamma,
                      InverseGaussian, LogNormal, NegativeBinomial, SkewNormal,
-                     VariateForm, ValueSupport
+                     Univariate, VariateForm, ValueSupport, Weibull
 
 # Register the standard EpiAware docstring conventions before any docstrings
 # are defined (see src/docstrings.jl).
@@ -55,10 +59,13 @@ include("docstrings.jl")
 # the ecosystem convention.
 export reparameterise, rescale, to_native, native
 
-# The abstract supertype, then the concrete wrapper and its front door, then the
-# per-family closed-form conversions it dispatches to.
+# The abstract supertype, then the concrete wrapper and its front door, then
+# the numeric fallback the front door dispatches to when no closed form is
+# registered, then the per-family conversions themselves (closed-form and
+# numeric alike).
 include("interface.jl")
 include("Reparameterised.jl")
+include("numeric.jl")
 include("families.jl")
 
 @static if VERSION >= v"1.11"
