@@ -25,6 +25,64 @@ an explicit domain of validity rather than a silently nonsense distribution.
 relation has no elementary inverse, so it belongs to the numeric-fallback
 seam tracked separately (#41), not here.
 
+### `Weibull(mean, sd)`: the first numerically-solved parameterisation
+
+Registers `Weibull` by `(mean, sd)` (and `(mean, var)`, delegating to it).
+Unlike every other family, this has no exact closed form: the coefficient
+of variation depends on the native shape alone, through a strictly
+monotone one-dimensional equation, and the scale then follows in closed
+form once the shape is known. The shape is found by a bracketing
+root-find rather than exact algebra — a change to the package's own
+architecture, not merely a new family:
+
+- `_conversion_kind(D, Val(names))` is a new trait, resolved at compile
+  time on the `(family, names)` pair, that lets a family opt into a
+  solver-backed conversion instead of the "no reparameterisation is
+  registered" error. A family's own `to_native` method is always more
+  specific than the fallback that consults this trait, so an analytical
+  conversion always wins, with no registry and no priority table:
+  registering a closed form later for a currently-numeric pair silently
+  retires the numeric path with no migration needed.
+- The actual root-find lives in a new package extension,
+  `ReparameterisedDistributionsRootsExt` (Roots.jl), kept out of the core
+  package per the maintainer's ruling that this package owns the equation
+  and the derivative rule but not a solver. Distributions.jl itself
+  depends on Roots, so the extension loads for essentially every user
+  without a new install.
+- The gradient with respect to the moments stays exact regardless of how
+  the root itself was found: two steps of an implicit-function-theorem
+  correction recover the derivative afterwards from the residual equation
+  alone, so a solver that returns a bare value (no derivative information
+  at all) still yields the correct gradient and Hessian. This is verified
+  directly against the classic failure mode — a solver silently truncating
+  a tracked value to its primal, which would otherwise produce a *wrong*,
+  often-zero gradient with no error — and against central differences.
+- A second package extension, `ReparameterisedDistributionsForwardDiffExt`,
+  strips a `ForwardDiff.Dual`-valued bracket to its primal before the
+  solve. This is a robustness fix, not a correctness one — the correction
+  above supplies the exact derivative either way — but it matters in
+  practice: `Roots.A42` is not always reliable in `Dual` arithmetic
+  (measured directly against this package's own equation, surfaced by an
+  end-to-end Turing/NUTS run rather than a synthetic case).
+  Enzyme and Mooncake are not yet given the same treatment; both currently
+  fail (loudly, not silently) when differentiating the numeric
+  conversion, tracing into Roots' own internals, and are recorded as
+  known-broken in the AD test registry pending the same fix.
+- Requesting a `(mean, sd)` outside the numerically solvable CV window —
+  roughly `1.3e-6` to `3e23` in Float64, far wider than any
+  epidemiologically meaningful delay — raises a `DomainError` naming the
+  attainable range under `check_args = true`, or gives `logpdf == -Inf`
+  (`pdf == 0`) under `check_args = false`, exactly as for an
+  analytically-invalid moment. A solve that runs but does not converge to
+  within tolerance raises rather than ever returning a distribution whose
+  moments differ from what was asked for.
+- `loglikelihood(d::Reparameterised, x::AbstractArray)` now converts once
+  and delegates to the native distribution's own batch method, rather
+  than reconverting once per observation through Distributions.jl's
+  generic scalar-`logpdf` summation. This benefits every family, but
+  matters most for a numeric one, where each reconversion re-runs a
+  root-find.
+
 ### `rescale`: scale a registered moment while holding the others fixed
 
 `rescale(d, factor; parameter = :mean)` scales `d`'s named registered
