@@ -6,9 +6,9 @@
 # Distributions.jl names a `Gamma` by its shape and scale, so the coordinates
 # the elicitation arrives in are not the ones the model has to be written in.
 # The usual workaround is to put independent priors on the native parameters
-# and hope the implied prior on the mean is close to what was meant.
-# This tutorial shows why that hope is misplaced, and what
-# [`reparameterise`](@ref) does instead.
+# and take whatever prior on the mean they imply.
+# This tutorial shows what that implied prior looks like, and how
+# [`reparameterise`](@ref) lets the prior be specified directly instead.
 #
 # ### What are we going to do in this exercise
 #
@@ -36,12 +36,11 @@ set_theme!(theme_latexfonts(); fontsize = 14)
 
 Random.seed!(1)
 
-# ## The prior you write is not the prior you meant
+# ## The prior implied by native parameters
 #
 # Suppose the delay is believed to have a mean near 8 days.
-# Writing that belief with native parameters means choosing priors for a shape
-# and a scale, because a Gamma has no mean parameter to attach a prior to.
-# Independent, individually reasonable choices look like this.
+# A Gamma has no mean parameter, so writing that belief with native
+# parameters means choosing priors for a shape and a scale.
 
 shape_prior = truncated(Normal(2.0, 1.0); lower = 0.0)
 scale_prior = truncated(Normal(4.0, 2.0); lower = 0.0)
@@ -52,13 +51,13 @@ scale_prior = truncated(Normal(4.0, 2.0); lower = 0.0)
 n = 20_000
 implied_mean = rand(shape_prior, n) .* rand(scale_prior, n)
 
-# Putting the prior where it was meant to go needs no pushforward at all.
+# We can instead specify the prior on the mean directly, which is what
+# `reparameterise` makes usable inside a model.
 
 mean_prior = truncated(Normal(8.0, 3.0); lower = 0.0)
 direct_mean = rand(mean_prior, n)
 
-# Plotted together, the two disagree about the thing the modeller actually had
-# an opinion on.
+# Plotted together, the two priors on the mean differ.
 
 priors = vcat(
     DataFrame(mean = implied_mean, source = "implied by shape × scale"),
@@ -71,18 +70,16 @@ draw(
     AlgebraOfGraphics.density()
 )
 
-# The implied prior is skewed, wider, and puts real mass on means the modeller
-# would have ruled out.
+# The implied prior is skewed and wider, and puts mass on means outside the
+# elicited belief.
 #
-# The two priors also cannot be reconciled by tuning the native ones.
+# Tuning the native priors cannot fix this.
 # Independent priors on shape and scale never compose into an arbitrary prior
-# on the mean, because the mean is a product of the two and carries their
-# dependence with it.
+# on the mean, because the mean is a product of the two.
 
 # ## Writing the model in moment coordinates
 #
-# `reparameterise` returns a distribution whose parameters are the moments, so
-# the prior goes where it was elicited.
+# `reparameterise` returns a distribution whose parameters are the moments.
 # The delay below has a mean of 8 days and a standard deviation of 3.
 
 truth = reparameterise(Gamma; mean = 8.0, sd = 3.0)
@@ -105,7 +102,7 @@ chain = sample(delay(y), NUTS(), 1000; progress = false)
 # ## Reading the posterior
 #
 # The chain comes back in the coordinates the delay was elicited in, so the
-# summary is directly comparable to what was believed beforehand.
+# summary is directly comparable to the prior.
 
 summarystats(chain)
 
@@ -126,10 +123,9 @@ draw(
     facet = (; linkxaxes = :none)
 )
 
-# The conversion from moments to native parameters is exact algebra rather than
-# a numerical solve, so the model stays differentiable and the gradient with
-# respect to the mean and the standard deviation is exact.
-# That is what lets NUTS sample in moment coordinates at no extra cost.
+# The conversion from moments to native parameters is exact algebra rather
+# than a numerical solve, so the model stays differentiable and the gradient
+# with respect to the mean and the standard deviation is exact.
 
 # ## What to do next
 #
