@@ -138,6 +138,40 @@ end
     @test isfinite(logpdf(good, 7.5))
 end
 
+@testitem "to_native: nothing means no member of the family, checked first" begin
+    using Distributions
+
+    # The guard runs before any algebra: a negative `sd` never reaches the
+    # `sqrt`/squaring that would otherwise alias it onto a valid distribution.
+    @test to_native(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) === nothing
+    @test to_native(LogNormal, Val((:mean, :sd)), (8.0, 1.0)) isa LogNormal
+
+    # The delegating `(mean, var)` methods must guard `var > 0` themselves,
+    # before the `sqrt` — a negative variance must come back `nothing`, not
+    # throw from inside `sqrt`.
+    @test to_native(LogNormal, Val((:mean, :var)), (8.0, -4.0)) === nothing
+    @test to_native(Gamma, Val((:mean, :var)), (8.0, -4.0)) === nothing
+    @test to_native(Beta, Val((:mean, :var)), (0.3, -0.01)) === nothing
+    @test to_native(InverseGaussian, Val((:mean, :var)), (3.0, -4.0)) ===
+          nothing
+    @test to_native(Weibull, Val((:mean, :var)), (8.0, -9.0)) === nothing
+end
+
+@testitem "loglikelihood: an invalid wrapper is guarded, not silently wrong" begin
+    using Distributions
+
+    # #80: the batched `loglikelihood` used to call `loglikelihood(native(d),
+    # x)` with no guard at all, so an invalid `check_args = false` wrapper
+    # gave `-Inf` from scalar `logpdf` but a finite, wrong answer from the
+    # batched path. The single hook forces the guard to be written, because
+    # `nothing` cannot be passed to `Distributions.loglikelihood`.
+    bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
+    obs = [7.5, 8.0, 9.0]
+
+    @test loglikelihood(bad, obs) == -Inf
+    @test loglikelihood(bad, obs) == sum(x -> logpdf(bad, x), obs)
+end
+
 @testitem "reparameterise: keyword order does not change the meaning" begin
     using Distributions
 
