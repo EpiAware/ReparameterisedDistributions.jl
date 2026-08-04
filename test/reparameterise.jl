@@ -91,6 +91,25 @@ end
     @test_throws ArgumentError reparameterise(LogNormal)
 end
 
+@testitem "the _valid_moments compat alias shares dispatch with valid_moments" begin
+    using Distributions
+    import ReparameterisedDistributions: _valid_moments, valid_moments
+
+    # NEWS.md promises that a downstream package which added a method under
+    # the pre-#80 private name keeps working. Pin both halves of that: the
+    # alias is literally the same generic function, and a method added
+    # through the old name dispatches through the new public one too.
+    @test _valid_moments === valid_moments
+
+    function ReparameterisedDistributions._valid_moments(
+            ::Type{LogNormal}, ::Val{(:aliascompat,)}, vals)
+        return vals[1] > 0
+    end
+
+    @test valid_moments(LogNormal, Val((:aliascompat,)), (1.0,)) == true
+    @test valid_moments(LogNormal, Val((:aliascompat,)), (-1.0,)) == false
+end
+
 @testitem "reparameterise: check_args validates the moments themselves" begin
     using Distributions
 
