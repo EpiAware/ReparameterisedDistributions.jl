@@ -14,18 +14,16 @@
 
 ## Why ReparameterisedDistributions?
 
-Distributions.jl parameterises each family by its native parameters: a `Gamma`
-by shape and scale, a `LogNormal` by the mean and standard deviation of its
-logarithm. Modellers rarely reason in those coordinates. A delay distribution is
-elicited as a mean and a standard deviation, and a prior belongs on the mean,
-not on a shape parameter that only implies one.
-
-A prior on a moment cannot be expressed through a native leaf, because
-independent priors on shape and scale do not compose into a prior on the mean.
-This package wraps a distribution so that its moments *are* its parameters: the
-wrapper reports the moments as the estimable parameters, converts to the native
-distribution internally through an exact closed form, and stays differentiable
-so the moments can be sampled directly.
+- A delay is elicited as a mean and a standard deviation, but Distributions.jl
+  names each family by its native parameters, so the coordinates a modeller
+  reasons in are not the ones they have to supply.
+- Independent priors on shape and scale do not compose into a prior on the
+  mean, so a prior on a moment cannot be expressed through a native leaf at
+  all.
+- `reparameterise` makes the moments a distribution's parameters, so a prior
+  lands on the mean rather than on a shape parameter that merely implies one.
+- Conversion to the native distribution runs through an exact closed form and
+  stays differentiable, so the moments can be sampled directly inside a model.
 
 ## Getting started
 
