@@ -35,14 +35,15 @@ form once the shape is known. The shape is found by a bracketing
 root-find rather than exact algebra — a change to the package's own
 architecture, not merely a new family:
 
-- `_conversion_kind(D, Val(names))` is a new trait, resolved at compile
-  time on the `(family, names)` pair, that lets a family opt into a
-  solver-backed conversion instead of the "no reparameterisation is
-  registered" error. A family's own `to_native` method is always more
-  specific than the fallback that consults this trait, so an analytical
-  conversion always wins, with no registry and no priority table:
-  registering a closed form later for a currently-numeric pair silently
-  retires the numeric path with no migration needed.
+- A family with no exact closed form registers exactly the same two hooks
+  as an analytic family — one `to_native` method and one `valid_moments`
+  method — and calls the new public `solve_moment(D, Val(names), residual,
+  deriv, bracket, vals)` from inside its own `to_native` body. There is no
+  separate trait or registry: a family's own `to_native` method is always
+  more specific than the generic "no reparameterisation is registered"
+  fallback, so ordinary dispatch reaches it whenever one is registered,
+  and registering a closed form later for a currently-numeric pair is a
+  plain method redefinition.
 - The actual root-find lives in a new package extension,
   `ReparameterisedDistributionsRootsExt` (Roots.jl), kept out of the core
   package per the maintainer's ruling that this package owns the equation
@@ -82,6 +83,34 @@ architecture, not merely a new family:
   generic scalar-`logpdf` summation. This benefits every family, but
   matters most for a numeric one, where each reconversion re-runs a
   root-find.
+
+### A two-hook registration surface: `to_native` and `valid_moments`
+
+Registering a family — analytic or numeric — now needs exactly two public
+methods, not the half-private mix the numeric conversion above briefly
+required:
+
+- `valid_moments(D, Val(names), vals)::Bool`, promoted to `public` (the
+  former `_valid_moments`), states a family's constraints once; the guard
+  `logpdf`/`pdf` and construction under `check_args = true` both consult.
+  `const _valid_moments = valid_moments` is kept for one release, so a
+  downstream package that added a method under the old private name still
+  works.
+- `solve_moment(D, Val(names), residual, deriv, bracket, vals)`, new and
+  `public`, is the numeric driver a family with no exact closed form calls
+  from inside its own `to_native` method, passing its moment equation,
+  derivative and bracket as ordinary functions. This registers no method
+  on anything of this package's own: a numeric family's registration
+  footprint is identical in shape to an analytic one, one `to_native`
+  method and one `valid_moments` method.
+
+Deleted outright: the `_conversion_kind` trait, the `Analytic`/`Numeric`
+marker types, and the four private hooks a numeric family previously had
+to add methods to (`_moment_residual`, `_moment_residual_deriv`,
+`_moment_bracket`, `_from_solution`). None of them were an irreducible
+extension point — a family's own `to_native` method was already strictly
+more specific than the generic fallback, so it was always chosen by
+ordinary dispatch regardless of the trait.
 
 ### `rescale`: scale a registered moment while holding the others fixed
 
