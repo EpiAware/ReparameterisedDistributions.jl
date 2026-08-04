@@ -1,7 +1,7 @@
 # Closed-form conversions from a family's alternative parameters to its native
 # ones. Each is exact algebra, so it is differentiable and adds no solver. The
 # native distribution is built with `check_args = false`; validity is decided in
-# moment coordinates by `_valid_moments`, which the density consults so that an
+# moment coordinates by `valid_moments`, which the density consults so that an
 # invalid point yields `-Inf` rather than an error raised mid-gradient.
 
 # LogNormal by the mean and standard deviation of the distribution itself,
@@ -19,7 +19,7 @@ end
 # standard deviation must be checked in its own coordinates: the conversion
 # squares `sd / mean`, so a negative one maps onto exactly the same valid native
 # distribution as its positive counterpart.
-function _valid_moments(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
+function valid_moments(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     return mean > 0 && sd > 0
 end
@@ -30,7 +30,7 @@ function to_native(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
     return to_native(LogNormal, Val((:mean, :sd)), (mean, sqrt(var)))
 end
 
-function _valid_moments(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
+function valid_moments(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
     return mean > 0 && var > 0
 end
@@ -47,7 +47,7 @@ end
 # As for the LogNormal, the conversion squares `sd`, so the sign has to be
 # checked here or a negative standard deviation would give a valid — and
 # identical — native distribution.
-function _valid_moments(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
+function valid_moments(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     return mean > 0 && sd > 0
 end
@@ -57,7 +57,7 @@ function to_native(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
     return to_native(Gamma, Val((:mean, :sd)), (mean, sqrt(var)))
 end
 
-function _valid_moments(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
+function valid_moments(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
     return mean > 0 && var > 0
 end
@@ -71,7 +71,7 @@ function to_native(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
     return Gamma(shape, mean / shape; check_args = false)
 end
 
-function _valid_moments(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
+function valid_moments(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
     mean, shape = vals
     return mean > 0 && shape > 0
 end
@@ -95,7 +95,7 @@ function to_native(::Type{NegativeBinomial},
 end
 
 # `a = 0` is the Poisson limit, not a NegativeBinomial: `r = 1 / a` diverges.
-function _valid_moments(::Type{NegativeBinomial},
+function valid_moments(::Type{NegativeBinomial},
         ::Val{(:mean, :overdispersion)}, vals)
     mean, a = vals
     return mean > 0 && a > 0
@@ -119,7 +119,7 @@ function to_native(::Type{NegativeBinomial},
     return NegativeBinomial(dispersion, p; check_args = false)
 end
 
-function _valid_moments(::Type{NegativeBinomial},
+function valid_moments(::Type{NegativeBinomial},
         ::Val{(:dispersion, :mean)}, vals)
     dispersion, mean = vals
     return dispersion > 0 && mean > 0
@@ -135,7 +135,7 @@ function to_native(::Type{Exponential}, ::Val{(:rate,)}, vals)
     return Exponential(1 / rate; check_args = false)
 end
 
-function _valid_moments(::Type{Exponential}, ::Val{(:rate,)}, vals)
+function valid_moments(::Type{Exponential}, ::Val{(:rate,)}, vals)
     rate, = vals
     return rate > 0
 end
@@ -151,7 +151,7 @@ function to_native(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
     return Gamma(shape, 1 / rate; check_args = false)
 end
 
-function _valid_moments(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
+function valid_moments(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
     rate, shape = vals
     return rate > 0 && shape > 0
 end
@@ -183,7 +183,7 @@ function to_native(::Type{SkewNormal},
     return SkewNormal(centre, scale, alpha; check_args = false)
 end
 
-function _valid_moments(::Type{SkewNormal},
+function valid_moments(::Type{SkewNormal},
         ::Val{(:centre, :mass_below_centre, :scale)}, vals)
     centre, m, scale = vals
     return scale > 0 && 0 < m < 1
@@ -262,10 +262,9 @@ end
 # The scale cancels out of the CV relation, so the shape is pinned by one
 # bounded, monotone, one-dimensional equation in the CV alone; once it is
 # known the scale follows in closed form, `b = mean / Γ(1 + 1/a)`. This
-# family opts into the numeric fallback (see numeric.jl) instead of adding a
-# `to_native` method directly.
-_conversion_kind(::Type{Weibull}, ::Val{(:mean, :sd)}) = Numeric()
-
+# family has no `valid_moments`-style shortcut for the shape, so its
+# `to_native` calls `solve_moment` (numeric.jl) instead of exact algebra.
+#
 # Solved in `s = log(a)` (scale-free, so the bracket is a plain interval and
 # `a > 0` is automatic) and in `u = exp(-s) = 1/a`, taking logs of the CV
 # relation to avoid `Γ(1 + 2/a)` overflowing at small shapes:
@@ -277,14 +276,13 @@ _conversion_kind(::Type{Weibull}, ::Val{(:mean, :sd)}) = Numeric()
 # the CV is a strictly decreasing, and hence bijective, function of the
 # shape, so the root is unique and any sign-changing bracket is safe for a
 # bracketing solver.
-function _moment_residual(::Type{Weibull}, ::Val{(:mean, :sd)}, s, vals)
+function _weibull_residual(s, vals)
     mean, sd = vals
     u = exp(-s)
     return loggamma(1 + 2u) - 2 * loggamma(1 + u) - log1p((sd / mean)^2)
 end
 
-function _moment_residual_deriv(::Type{Weibull}, ::Val{(:mean, :sd)}, s,
-        vals)
+function _weibull_deriv(s, vals)
     u = exp(-s)
     return 2u * (digamma(1 + u) - digamma(1 + 2u))
 end
@@ -300,7 +298,7 @@ end
 # `shape_min` is NOT the loosest bound the residual equation alone could
 # support (`log1p(cv^2)` only overflows once `cv` exceeds roughly
 # `sqrt(typemax(T))`, around `1e154` in Float64). It is tighter, for two
-# reasons that both bind well before that: `_from_solution`'s scale
+# reasons that both bind well before that: `to_native`'s scale
 # completion, `exp(-logΓ(1 + 1/shape))`, underflows to EXACTLY ZERO once
 # `logΓ(1 + 1/shape)` exceeds roughly `-log(floatmin(T))` (~708 in
 # Float64); and, tighter still, Distributions.jl's own `var(::Weibull)`
@@ -329,19 +327,19 @@ end
 _weibull_shape_min(::Type{T}) where {T} = T(0.0125)
 _weibull_shape_max(::Type{T}) where {T} = T(5_000.0)
 
-function _moment_bracket(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
-    T = eltype(vals)
+function _weibull_bracket(pvals)
+    T = eltype(pvals)
     return log(_weibull_shape_min(T)), log(_weibull_shape_max(T))
 end
 
 # The shape follows from the solved root; the scale then follows in closed
 # form, `b = mean / Γ(1 + 1/a) = mean * exp(-logΓ(1 + u))`.
-function _from_solution(::Type{Weibull}, ::Val{(:mean, :sd)}, s, vals)
+function to_native(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    a = exp(s)
+    s = solve_moment(Weibull, Val((:mean, :sd)), _weibull_residual,
+        _weibull_deriv, _weibull_bracket, vals)
     u = exp(-s)
-    b = mean * exp(-loggamma(1 + u))
-    return Weibull(a, b; check_args = false)
+    return Weibull(exp(s), mean * exp(-loggamma(1 + u)); check_args = false)
 end
 
 # Both bounds are the CV attained at the registered bracket's ends, so they
@@ -373,7 +371,7 @@ function _weibull_cv_max(::Type{T}) where {T}
     return exp(x / 2)
 end
 
-function _valid_moments(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
+function valid_moments(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     (mean > 0 && sd > 0) || return false
     cv = sd / mean
@@ -388,8 +386,8 @@ function to_native(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
     return to_native(Weibull, Val((:mean, :sd)), (mean, sqrt(var)))
 end
 
-function _valid_moments(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
+function valid_moments(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
     return mean > 0 && var > 0 &&
-           _valid_moments(Weibull, Val((:mean, :sd)), (mean, sqrt(var)))
+           valid_moments(Weibull, Val((:mean, :sd)), (mean, sqrt(var)))
 end

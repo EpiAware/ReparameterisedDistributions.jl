@@ -1,63 +1,19 @@
-# The numeric fallback: a `(family, names)` pair with no registered closed
-# form, but whose conversion is a well-posed scalar root-find over a
-# monotone moment equation, opts into a solver-backed conversion instead of
-# `to_native`'s "no reparameterisation is registered" error.
+# The numeric seam: a family with no exact closed form still registers
+# exactly one `to_native` method and one `valid_moments` method, the same
+# contract as an analytic family, and calls `solve_moment` inside its own
+# `to_native` body to run a scalar root-find over a monotone moment
+# equation. No trait, no registry: an unregistered pair reaches the 3-arg
+# `to_native` fallback in Reparameterised.jl by ordinary dispatch.
 #
-# This file owns everything EXCEPT the root-find itself: the trait that
-# switches a pair onto the numeric path, the driver that turns a solved
-# root into a native distribution, and the derivative rule that keeps the
-# whole thing differentiable regardless of what the solver returns. The
-# root-find is supplied by a package extension (`_solve_moment_equation`
-# below), so no solver ships in this package.
-
-# --- The trait -------------------------------------------------------------
-#
-# Resolved on the (family, names) PAIR at compile time and stores nothing, so
-# `Reparameterised`'s field layout, and the `params` NTuple question, stay
-# untouched.
-
-"Marks a `(family, names)` pair as converting through an exact closed form."
-struct Analytic end
-
-"Marks a `(family, names)` pair as converting through a numeric root-find."
-struct Numeric end
-
-# Every pair starts `Analytic`; a family opts into the numeric path with a
-# more specific method returning `Numeric()`, registered alongside its
-# `_moment_residual` and friends (see the `Weibull` registration in
-# families.jl).
-_conversion_kind(::Type{D}, ::Val{names}) where {D, names} = Analytic()
-
-# --- The generic `to_native` delegator --------------------------------------
-#
-# `to_native`'s generic 3-arg method (defined in Reparameterised.jl)
-# dispatches here on the trait. A family's own `to_native` method — an exact
-# closed form — is always MORE SPECIFIC than that 3-arg fallback, so ordinary
-# dispatch picks it first whenever one is registered: analytical conversions
-# always win, with no registry and no priority table to maintain.
-
-function _to_native_fallback(::Analytic, ::Type{D}, ::Val{names},
-        vals) where {D, names}
-    throw(ArgumentError(
-        "no reparameterisation of $(D) by $(collect(names)) is " *
-        "registered; the registered parameterisations are listed " *
-        "in the package docs"))
-end
-
-function _to_native_fallback(::Numeric, ::Type{D}, ::Val{names},
-        vals) where {D, names}
-    pvals = map(_primal, vals)
-    lo, hi = _moment_bracket(D, Val(names), pvals)
-    f = s -> _moment_residual(D, Val(names), s, pvals)
-    _check_bracket(D, Val(names), vals, f(lo), f(hi))
-    s0 = _solve_moment_equation(f, lo, hi)
-    s = _implicit_correction(D, Val(names), s0, vals)
-    return _from_solution(D, Val(names), s, vals)
-end
+# This file owns the driver (`solve_moment`), the derivative rule that
+# keeps the whole thing differentiable regardless of what the solver
+# returns, and the three ways a numeric conversion fails cleanly. The
+# root-find itself is supplied by a package extension
+# (`_solve_moment_equation` below), so no solver ships in this package.
 
 # --- Stripping AD wrapper types for the solve itself ------------------------
 #
-# `s0` only ever needs to be a ROOT'S VALUE (see the derivative rule above):
+# `s0` only ever needs to be a ROOT'S VALUE (see the derivative rule below):
 # the correction recovers the exact derivative afterwards from whatever
 # `vals` the caller actually passed, whatever type `s0` arrived as. That
 # safety property is exploited here, not merely tolerated: the bracket and
@@ -74,8 +30,8 @@ end
 # well as the value, so an internal stall/no-progress check written
 # against `Dual` equality can fail to fire even once the VALUE has
 # converged, and the iteration runs out its budget. The residual and its
-# derivative are still evaluated in the caller's own type during
-# `_implicit_correction`, so this costs nothing in correctness or in which
+# derivative are still evaluated in the caller's own type during the
+# correction below, so this costs nothing in correctness or in which
 # types survive to the returned distribution.
 #
 # The identity default keeps a plain `Float64`/`Float32` solve unchanged.
@@ -85,31 +41,65 @@ end
 # reduces to a scalar.
 _primal(x::Real) = x
 
-# --- The derivative rule -----------------------------------------------------
-#
-# The implicit function theorem written as arithmetic rather than as a
-# per-backend AD rule. `s0` is a root of `F`, so subtracting `F / F_s` leaves
-# the VALUE unchanged to machine precision while making the DERIVATIVE exactly
-# `-F_vals / F_s`. The incoming `ds0/dvals` cancels term for term, so this
-# holds whatever derivative `s0` arrived with — a garbage one, a zero one, or
-# none at all, which is what makes the seam safe against a solver backend that
-# returns a bare `Float64` and silently truncates a `Dual`.
-#
-# Two steps, not one: measured against the Weibull `(mean, sd)` equation, one
-# correction step gives a correct gradient but a Hessian wrong by 2% on the
-# diagonal and 21% off-diagonal. There is no loop over a convergence
-# predicate, no bracket and no bisection here — a fixed two statements — so
-# every future solver backend inherits this correctness rather than
-# re-deriving it, which is exactly how a backend ends up silently truncating.
-function _implicit_correction(::Type{D}, ::Val{names}, s0,
-        vals) where {D, names}
-    s = s0
+@doc raw"
+
+Solve a family's own moment equation for a scalar `s`, exactly and
+differentiably, regardless of which solver backend runs the root-find.
+
+A numeric family calls this inside its own [`to_native`](@ref) method,
+passing its own `residual`, `deriv` and `bracket` as ordinary functions —
+this registers no method on anything of ours, so a downstream package
+supplies its own three functions exactly as this package's own `Weibull`
+registration does (see `src/families.jl`).
+
+- `residual(s, vals)` is the moment equation, zero at the solution.
+- `deriv(s, vals)` is its derivative with respect to `s`.
+- `bracket(pvals) -> (lo, hi)` is a sign-changing interval for `residual`,
+  evaluated on `vals` stripped to its primal type.
+
+The root-find itself runs on the primal-stripped `vals`, then two steps of
+an implicit-function-theorem correction recover the exact derivative in
+the caller's own type afterwards: `s` is a root of `residual`, so
+subtracting `residual / deriv` leaves the VALUE unchanged to machine
+precision while making the DERIVATIVE exactly `-residual_vals / deriv`,
+whatever derivative the solver's own `s` arrived with (a garbage one, a
+zero one, or none at all). Two steps, not one: measured against the
+Weibull `(mean, sd)` equation, one correction step gives a correct
+gradient but a Hessian wrong by 2% on the diagonal and 21%
+off-diagonal.
+
+# Arguments
+- the native family being converted to.
+- `Val(names)`: the alternative parameter names.
+- `residual`, `deriv`, `bracket`: the family's own moment equation.
+- `vals`: the alternative parameter values, in `names` order.
+
+# Examples
+```@example
+using ReparameterisedDistributions, Distributions
+
+# A toy equation, exp(s) = 2, solved for illustration; a real family's
+# residual is its own moment equation (see the `Weibull` registration in
+# src/families.jl for a worked example).
+s = solve_moment(Gamma, Val((:shape,)), (s, vals) -> exp(s) - vals[1],
+    (s, vals) -> exp(s), pvals -> (-10.0, 10.0), (2.0,))
+```
+
+# See also
+- [`to_native`](@ref): the conversion a numeric family calls this from.
+- [`valid_moments`](@ref): the guard a numeric family also needs.
+"
+function solve_moment(::Type{D}, ::Val{names}, residual::R, deriv::G,
+        bracket::B, vals) where {D, names, R, G, B}
+    pvals = map(_primal, vals)
+    lo, hi = bracket(pvals)
+    f = s -> residual(s, pvals)
+    _check_bracket(D, Val(names), vals, f(lo), f(hi))
+    s = _solve_moment_equation(f, lo, hi)
     for _ in 1:2
-        s = s -
-            _moment_residual(D, Val(names), s, vals) /
-            _moment_residual_deriv(D, Val(names), s, vals)
+        s = s - residual(s, vals) / deriv(s, vals)
     end
-    _check_solved(D, Val(names), s, vals)
+    _check_solved(D, Val(names), residual, s, vals)
     return s
 end
 
@@ -132,7 +122,7 @@ end
 # --- The three ways a numeric conversion fails cleanly -----------------------
 #
 # (a), moments outside a family's numerically solvable window, is handled by
-# the existing `_valid_moments` machinery a numeric family adds a method for,
+# the existing `valid_moments` machinery a numeric family adds a method for,
 # unchanged in kind from the analytical families. (b) and (c) are below.
 
 # (b) The moment equation does not change sign over the registered bracket:
@@ -152,8 +142,9 @@ end
 # than return a distribution whose moments differ from what was asked for.
 _moment_atol(::Type{T}) where {T} = sqrt(eps(T))
 
-function _check_solved(::Type{D}, ::Val{names}, s, vals) where {D, names}
-    r = _moment_residual(D, Val(names), s, vals)
+function _check_solved(::Type{D}, ::Val{names}, residual::R, s,
+        vals) where {D, names, R}
+    r = residual(s, vals)
     abs(r) <= _moment_atol(float(typeof(r))) && return nothing
     throw(DomainError(vals,
         "the numeric conversion of $(D) by $(collect(names)) did not " *

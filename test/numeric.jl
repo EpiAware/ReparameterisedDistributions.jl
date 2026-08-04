@@ -1,9 +1,9 @@
-# The numeric fallback (src/numeric.jl) and its one registered family,
+# The numeric seam (src/numeric.jl) and its one registered family,
 # `Weibull(mean, sd)` (src/families.jl). Unlike every other family in
 # test/families.jl, this conversion is a solver-backed root-find rather than
-# exact algebra, so these tests exercise the seam itself — the trait, the
-# implicit-function-theorem correction, the three ways a solve fails cleanly
-# — and not just the Weibull maths.
+# exact algebra, so these tests exercise the seam itself — `solve_moment`,
+# the implicit-function-theorem correction, the three ways a solve fails
+# cleanly — and not just the Weibull maths.
 #
 # `using Distributions` is enough to load the Roots extension: Distributions
 # hard-depends on Roots, so `Base.loaded_modules` already contains it by the
@@ -14,15 +14,6 @@
     ext = Base.get_extension(
         ReparameterisedDistributions, :ReparameterisedDistributionsRootsExt)
     @test ext !== nothing
-end
-
-@testitem "Weibull(mean, sd): opts into the numeric fallback" begin
-    using Distributions
-
-    @test ReparameterisedDistributions._conversion_kind(
-        Weibull, Val((:mean, :sd))) === ReparameterisedDistributions.Numeric()
-    @test ReparameterisedDistributions._conversion_kind(
-        Gamma, Val((:mean, :sd))) === ReparameterisedDistributions.Analytic()
 end
 
 @testitem "Weibull(mean, sd): moment recovery sweep" begin
@@ -67,57 +58,46 @@ end
     @test logpdf(d, 7.0) ≈ logpdf(nd, 7.0)
 end
 
-# --- Analytical always wins --------------------------------------------
+# --- A numeric family registers exactly to_native + valid_moments -------
 
-@testitem "Analytical still wins over a Numeric() trait override" begin
+@testitem "A numeric family needs only to_native (via solve_moment) and valid_moments" begin
     using Distributions
-    import ReparameterisedDistributions: _conversion_kind, _moment_residual,
-                                         _moment_residual_deriv,
-                                         _moment_bracket, _from_solution,
-                                         _to_native_fallback, Numeric,
-                                         Analytic
+    import ReparameterisedDistributions: solve_moment
 
-    # A test-only numeric registration on a pair `Gamma(mean, sd)` that
-    # ALREADY has a closed form. Even flipping the trait to `Numeric()`
-    # must not change what `reparameterise(Gamma; mean, sd)` returns: the
-    # directly-registered `to_native(::Type{Gamma}, ::Val{(:mean, :sd)},
-    # vals)` method is strictly more specific than the generic 3-arg
-    # fallback that consults the trait, so ordinary dispatch never reaches
-    # it. `to_native`'s dispatch specificity decides, not the trait.
-    _conversion_kind(::Type{Gamma}, ::Val{(:mean, :sd)}) = Numeric()
+    # A test-only registration on `Gamma(mean, sdnumeric)`, a pair with no
+    # existing method, using the exact two-hook contract every family uses
+    # — analytic or numeric alike: one `to_native` method (calling
+    # `solve_moment` inside its body here) and one `valid_moments` method.
+    # No trait, no extra registration. Solved directly (shape = mean^2 /
+    # sd^2 is exact), so this is a driver oracle rather than a test of
+    # solver correctness: the numeric answer can be cross-checked against
+    # the true `Gamma(mean, sd)` closed form.
+    _residual(s, vals) = s - log(vals[1]^2 / vals[2]^2)
+    _deriv(s, vals) = one(s)
+    _bracket(pvals) = (eltype(pvals)(-20.0), eltype(pvals)(20.0))
 
-    # Solved directly (shape = mean^2 / sd^2 is exact), so this is a
-    # driver oracle rather than a test of solver correctness: the
-    # numeric answer can be cross-checked against the true closed form
-    # without depending on any nontrivial maths of its own.
-    function _moment_residual(::Type{Gamma}, ::Val{(:mean, :sd)}, s, vals)
+    function ReparameterisedDistributions.to_native(
+            ::Type{Gamma}, ::Val{(:mean, :sdnumeric)}, vals)
         m, sd = vals
-        return s - log(m^2 / sd^2)
-    end
-    _moment_residual_deriv(::Type{Gamma}, ::Val{(:mean, :sd)}, s, vals) = one(s)
-    function _moment_bracket(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
-        T = eltype(vals)
-        return T(-20.0), T(20.0)
-    end
-    function _from_solution(::Type{Gamma}, ::Val{(:mean, :sd)}, s, vals)
-        m, sd = vals
+        s = solve_moment(Gamma, Val((:mean, :sdnumeric)), _residual, _deriv,
+            _bracket, vals)
         shape = exp(s)
         return Gamma(shape, m / shape; check_args = false)
     end
 
-    for cv in (0.05, 0.2, 1.0, 3.0, 5.0)
-        m, sd = 8.0, 8.0 * cv
-        oracle = _to_native_fallback(Numeric(), Gamma, Val((:mean, :sd)),
-            (m, sd))
-        analytic = to_native(Gamma, Val((:mean, :sd)), (m, sd))
-        @test oracle.α≈analytic.α rtol=1e-10
-        @test oracle.θ≈analytic.θ rtol=1e-10
+    function ReparameterisedDistributions.valid_moments(
+            ::Type{Gamma}, ::Val{(:mean, :sdnumeric)}, vals)
+        m, sd = vals
+        return m > 0 && sd > 0
     end
 
-    # And the public entry point is untouched: it still returns the exact
-    # closed form, not the numeric oracle above.
-    d = reparameterise(Gamma; mean = 8.0, sd = 3.0)
-    @test native(d) ≈ to_native(Gamma, Val((:mean, :sd)), (8.0, 3.0))
+    for cv in (0.05, 0.2, 1.0, 3.0, 5.0)
+        m, sd = 8.0, 8.0 * cv
+        d = reparameterise(Gamma; mean = m, sdnumeric = sd)
+        analytic = to_native(Gamma, Val((:mean, :sd)), (m, sd))
+        @test native(d).α≈analytic.α rtol=1e-10
+        @test native(d).θ≈analytic.θ rtol=1e-10
+    end
 end
 
 @testitem "An unregistered pair still raises the analytical error" begin
@@ -198,18 +178,16 @@ end
 
 @testitem "A bracket that never changes sign raises DomainError" begin
     using Distributions
-    import ReparameterisedDistributions: _conversion_kind, _moment_residual,
-                                         _moment_residual_deriv,
-                                         _moment_bracket, Numeric
+    import ReparameterisedDistributions: solve_moment
 
     # `s^2 + 1` never crosses zero, so `_check_bracket` must catch this
     # before the solver ever runs.
-    _conversion_kind(::Type{Gamma}, ::Val{(:badbracket,)}) = Numeric()
-    _moment_residual(::Type{Gamma}, ::Val{(:badbracket,)}, s, vals) = s^2 + 1
-    _moment_residual_deriv(::Type{Gamma}, ::Val{(:badbracket,)}, s, vals) = 2s
-    function _moment_bracket(::Type{Gamma}, ::Val{(:badbracket,)}, vals)
-        T = eltype(vals)
-        return T(-1.0), T(1.0)
+    function ReparameterisedDistributions.to_native(
+            ::Type{Gamma}, ::Val{(:badbracket,)}, vals)
+        s = solve_moment(Gamma, Val((:badbracket,)),
+            (s, vals) -> s^2 + 1, (s, vals) -> 2s,
+            pvals -> (eltype(pvals)(-1.0), eltype(pvals)(1.0)), vals)
+        return Gamma(exp(s), 1.0; check_args = false)
     end
 
     @test_throws DomainError reparameterise(Gamma; badbracket = 1.0)
@@ -224,23 +202,17 @@ end
 
 @testitem "A mis-registered derivative raises DomainError from _check_solved" begin
     using Distributions
-    import ReparameterisedDistributions: _conversion_kind, _moment_residual,
-                                         _moment_residual_deriv,
-                                         _moment_bracket, _from_solution,
-                                         Numeric
+    import ReparameterisedDistributions: solve_moment
 
     # The bracket is valid and the root (s = 3) is exact, so the solver
     # itself finds it cleanly; the deliberately-wrong derivative (always
     # zero) sends the implicit-function-theorem correction to a
     # division-by-zero, landing far off the root.
-    _conversion_kind(::Type{Gamma}, ::Val{(:badtol,)}) = Numeric()
-    _moment_residual(::Type{Gamma}, ::Val{(:badtol,)}, s, vals) = s - 3.0
-    _moment_residual_deriv(::Type{Gamma}, ::Val{(:badtol,)}, s, vals) = 0.0
-    function _moment_bracket(::Type{Gamma}, ::Val{(:badtol,)}, vals)
-        T = eltype(vals)
-        return T(0.0), T(10.0)
-    end
-    function _from_solution(::Type{Gamma}, ::Val{(:badtol,)}, s, vals)
+    function ReparameterisedDistributions.to_native(
+            ::Type{Gamma}, ::Val{(:badtol,)}, vals)
+        s = solve_moment(Gamma, Val((:badtol,)),
+            (s, vals) -> s - 3.0, (s, vals) -> 0.0,
+            pvals -> (eltype(pvals)(0.0), eltype(pvals)(10.0)), vals)
         return Gamma(exp(s), 1.0; check_args = false)
     end
 

@@ -211,7 +211,8 @@ function _build(::Type{D}, ::Val{names},
     pvals = promote(map(float, cvals)...)
     d = _reparameterised(D, cnames, pvals)
     if check_args
-        _check_moments(D, Val(cnames), pvals)
+        valid_moments(D, Val(cnames), pvals) || throw(DomainError(pvals,
+            "invalid $(collect(cnames)) for $(D)"))
         _check_native(d)
     end
     return d
@@ -221,58 +222,49 @@ end
 
 Whether a family's alternative parameters are valid, answered without throwing.
 
-This is the predicate [`_check_moments`](@ref) throws on, and — the reason it is
-separate — the predicate the density guards with. A sampler exploring an
-unconstrained parameter will propose an invalid point; it needs `-Inf` back, not
-an exception raised in the middle of a gradient. So `logpdf` consults this and
-returns `-Inf` rather than converting to a native distribution that would either
-throw or, worse, be silently valid.
+This is the predicate `reparameterise` throws on under `check_args = true`,
+and — the reason it does not throw itself — the predicate the density guards
+with. A sampler exploring an unconstrained parameter will propose an invalid
+point; it needs `-Inf` back, not an exception raised in the middle of a
+gradient. So `logpdf` consults this and returns `-Inf` rather than converting
+to a native distribution that would either throw or, worse, be silently
+valid.
 
-Silently valid is the real hazard. The LogNormal and Gamma conversions square the
-standard deviation, so a negative one maps onto exactly the same native
+Silently valid is the real hazard. The LogNormal and Gamma conversions square
+the standard deviation, so a negative one maps onto exactly the same native
 distribution as its positive counterpart: without this predicate the density
-would be finite, and identical to the density at `+sd`, giving a mirror mode in
-an unconstrained parameterisation. Checking at construction alone does not help,
-because that check is precisely what a sampler turns off.
+would be finite, and identical to the density at `+sd`, giving a mirror mode
+in an unconstrained parameterisation. Checking at construction alone does not
+help, because that check is precisely what a sampler turns off.
 
-The fallback accepts anything; a family adds a method alongside its
-[`to_native`](@ref).
+Every registered `(family, names)` pair needs exactly one method of this
+alongside its [`to_native`](@ref) method; the fallback accepts anything.
 
 # Arguments
 - the native family being checked for.
 - `Val(names)`: the alternative parameter names.
 - `vals`: the alternative parameter values, in `names` order.
+
+# Examples
+```@example
+using ReparameterisedDistributions, Distributions
+
+valid_moments(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
+```
+
+# See also
+- [`to_native`](@ref): the conversion this validates alongside.
 "
-_valid_moments(::Type{D}, ::Val{names}, vals) where {D, names} = true
+valid_moments(::Type{D}, ::Val{names}, vals) where {D, names} = true
+
+# Deprecated alias kept for one release: a downstream package that added a
+# method to the old private name keeps working, since a `const` alias to a
+# generic function still accepts new methods.
+const _valid_moments = valid_moments
 
 # Whether this wrapper's own moments are valid.
 function _valid(d::Reparameterised{D, names}) where {D, names}
-    return _valid_moments(D, Val(names), d.vals)
-end
-
-@doc raw"
-
-Check that a family's alternative parameters are themselves valid, throwing if
-they are not.
-
-Checking the native distribution is not enough. A closed form can map an invalid
-moment onto a perfectly valid native distribution: a negative standard deviation
-squares away in the LogNormal conversion, yielding the same native distribution
-as its positive counterpart, so the wrapper would report a parameter it does not
-behave as. The moments have to be checked in their own coordinates.
-
-A family states its constraints once, in [`_valid_moments`](@ref); this raises on
-them. The message is per-family so that a caller learns which moment was wrong.
-
-# Arguments
-- the native family being checked for.
-- `Val(names)`: the alternative parameter names.
-- `vals`: the alternative parameter values, in `names` order.
-"
-function _check_moments(::Type{D}, ::Val{names}, vals) where {D, names}
-    _valid_moments(D, Val(names), vals) || throw(DomainError(vals,
-        "invalid $(collect(names)) for $(D)"))
-    return nothing
+    return valid_moments(D, Val(names), d.vals)
 end
 
 # Force the native conversion through the family's own argument checks once, at
@@ -308,16 +300,13 @@ function native(d::Reparameterised{D, names}) where {D, names}
     return to_native(D, Val(names), d.vals)
 end
 
-# Delegates on `_conversion_kind(D, Val(names))`, a trait resolved on the
-# (family, names) pair at compile time (see numeric.jl): `Analytic()` keeps
-# the "no reparameterisation is registered" throw below unchanged, and
-# `Numeric()` runs a solver-backed conversion instead. A family's own
-# `to_native` method is always strictly more specific than this 3-arg
-# fallback, so it is chosen first by ordinary dispatch whenever one is
-# registered — analytical conversions always win. The docstring below must
-# stay immediately adjacent to the function it documents: even a comment
-# between them silently detaches it (verified — Aqua's undocumented-names
-# check is what catches this).
+# A family's own `to_native` method — analytic or numeric, calling
+# `solve_moment` inside its body — is always strictly more specific than
+# this 3-arg fallback, so ordinary dispatch picks it first whenever one is
+# registered; this generic method is only reached for an unregistered
+# pair. The docstring below must stay immediately adjacent to the function
+# it documents: even a comment between them silently detaches it (verified
+# — Aqua's undocumented-names check is what catches this).
 @doc raw"
 
 The closed-form conversion from a family's alternative parameters to the native
@@ -347,8 +336,10 @@ to_native(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
 - [`native`](@ref): the wrapper-level accessor most callers want instead.
 "
 function to_native(::Type{D}, ::Val{names}, vals) where {D, names}
-    return _to_native_fallback(_conversion_kind(D, Val(names)), D,
-        Val(names), vals)
+    throw(ArgumentError(
+        "no reparameterisation of $(D) by $(collect(names)) is " *
+        "registered; the registered parameterisations are listed " *
+        "in the package docs"))
 end
 
 # The alternative parameter names this wrapper was built with.
