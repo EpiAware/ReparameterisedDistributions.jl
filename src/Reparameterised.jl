@@ -270,8 +270,9 @@ The closed-form conversion from a family's alternative parameters to the
 native distribution, or `nothing` if the parameters describe no member of
 the family.
 
-Each supported (family, parameter-name) pair adds a method. A method must be
-exact algebra rather than a numerical solve, must check its own parameters'
+Each supported (family, parameter-name) pair adds a method. A method should
+be exact algebra where a closed form exists, and otherwise call
+[`solve_moment`](@ref). It must check its own parameters'
 validity BEFORE doing anything with them (in particular before a `sqrt` or
 similar, which would throw on invalid input rather than reporting it as
 `nothing`), and must build the native distribution with `check_args = false`,
@@ -415,9 +416,11 @@ end
 # REPL can afford one more line: the native distribution the wrapper
 # actually evaluates as, which is the thing a user most often wants to check
 # when the moments are unfamiliar territory.
-function Base.show(io::IO, ::MIME"text/plain", d::Reparameterised)
+function Base.show(io::IO, ::MIME"text/plain",
+        d::Reparameterised{D, names}) where {D, names}
     show(io, d)
     print(io, "\n  native: ")
-    show(io, native(d))
+    nd = to_native(D, Val(names), d.vals)
+    nd === nothing ? print(io, "invalid parameters") : show(io, nd)
     return nothing
 end
