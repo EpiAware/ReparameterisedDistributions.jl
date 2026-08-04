@@ -211,73 +211,20 @@ function _build(::Type{D}, ::Val{names},
     pvals = promote(map(float, cvals)...)
     d = _reparameterised(D, cnames, pvals)
     if check_args
-        valid_moments(D, Val(cnames), pvals) || throw(DomainError(pvals,
+        nd = to_native(D, Val(cnames), pvals)
+        nd === nothing && throw(DomainError(pvals,
             "invalid $(collect(cnames)) for $(D)"))
-        _check_native(d)
+        _check_native(nd)
     end
     return d
 end
 
-@doc raw"
-
-Whether a family's alternative parameters are valid, answered without throwing.
-
-This is the predicate `reparameterise` throws on under `check_args = true`,
-and — the reason it does not throw itself — the predicate the density guards
-with. A sampler exploring an unconstrained parameter will propose an invalid
-point; it needs `-Inf` back, not an exception raised in the middle of a
-gradient. So `logpdf` consults this and returns `-Inf` rather than converting
-to a native distribution that would either throw or, worse, be silently
-valid.
-
-Silently valid is the real hazard. The LogNormal and Gamma conversions square
-the standard deviation, so a negative one maps onto exactly the same native
-distribution as its positive counterpart: without this predicate the density
-would be finite, and identical to the density at `+sd`, giving a mirror mode
-in an unconstrained parameterisation. Checking at construction alone does not
-help, because that check is precisely what a sampler turns off.
-
-Every registered `(family, names)` pair needs exactly one method of this
-alongside its [`to_native`](@ref) method; the fallback accepts anything.
-
-# Arguments
-- the native family being checked for.
-- `Val(names)`: the alternative parameter names.
-- `vals`: the alternative parameter values, in `names` order.
-
-# Examples
-Register under the parameter names sorted alphabetically: `reparameterise`
-canonicalises its keywords that way before dispatching.
-
-`valid_moments` is public but not exported, so import it by name.
-
-```@example
-using ReparameterisedDistributions, Distributions
-using ReparameterisedDistributions: valid_moments
-
-valid_moments(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
-```
-
-# See also
-- [`to_native`](@ref): the conversion this validates alongside.
-"
-valid_moments(::Type{D}, ::Val{names}, vals) where {D, names} = true
-
-# Deprecated alias kept for one release: a downstream package that added a
-# method to the old private name keeps working, since a `const` alias to a
-# generic function still accepts new methods.
-const _valid_moments = valid_moments
-
-# Whether this wrapper's own moments are valid.
-function _valid(d::Reparameterised{D, names}) where {D, names}
-    return valid_moments(D, Val(names), d.vals)
-end
-
-# Force the native conversion through the family's own argument checks once, at
-# construction. `to_native` itself builds with `check_args = false` so it stays
-# branch-free and differentiable on the hot path.
-function _check_native(d::Reparameterised)
-    nd = native(d)
+# Force the native conversion through the family's own argument checks once,
+# at construction. `to_native` itself builds with `check_args = false` so it
+# stays branch-free and differentiable on the hot path; this catches a class
+# of invalid input the moment guard structurally cannot, such as an infinite
+# moment (`Gamma(mean = Inf, sd = 1.0)` passes `mean > 0` but is not a Gamma).
+function _check_native(nd::Distribution)
     Base.typename(typeof(nd)).wrapper(Distributions.params(nd)...)
     return nothing
 end
@@ -289,7 +236,8 @@ The native distribution a wrapper's alternative parameters convert to.
 Every density, moment and sampling method on a `Reparameterised` goes through
 this, so it is also the way to reach the native parameters — the ones the
 wrapped family was actually built from — when the moments alone are not
-enough: `params(native(d))` rather than `params(d)`.
+enough: `params(native(d))` rather than `params(d)`. Throws a `DomainError`
+if `d`'s parameters are invalid — see [`to_native`](@ref).
 
 # Examples
 ```@example
@@ -303,7 +251,10 @@ native(d), params(native(d))
 - [`to_native`](@ref): the per-family closed form this dispatches to.
 "
 function native(d::Reparameterised{D, names}) where {D, names}
-    return to_native(D, Val(names), d.vals)
+    nd = to_native(D, Val(names), d.vals)
+    nd === nothing && throw(DomainError(d.vals,
+        "invalid $(collect(names)) for $(D)"))
+    return nd
 end
 
 # A family's own `to_native` method — analytic or numeric, calling
@@ -315,14 +266,24 @@ end
 # — Aqua's undocumented-names check is what catches this).
 @doc raw"
 
-The closed-form conversion from a family's alternative parameters to the native
-distribution.
+The closed-form conversion from a family's alternative parameters to the
+native distribution, or `nothing` if the parameters describe no member of
+the family.
 
 Each supported (family, parameter-name) pair adds a method. A method must be
-exact algebra rather than a numerical solve, and must build the native
-distribution with `check_args = false`, so the conversion stays differentiable
-and a sampler probing an invalid point yields `-Inf` rather than throwing
-mid-gradient.
+exact algebra rather than a numerical solve, must check its own parameters'
+validity BEFORE doing anything with them (in particular before a `sqrt` or
+similar, which would throw on invalid input rather than reporting it as
+`nothing`), and must build the native distribution with `check_args = false`,
+so the conversion stays differentiable and a sampler probing an invalid point
+yields `-Inf` rather than throwing mid-gradient.
+
+`nothing` cannot be recovered from the native distribution's own type: some
+conversions are even in the invalid direction (the LogNormal and Gamma
+conversions square the standard deviation, so a negative one builds exactly
+the same, perfectly valid native distribution as its positive counterpart),
+so the check has to happen in the alternative parameters' own coordinates,
+inside this method, before the conversion runs.
 
 # Arguments
 - the native family being converted to.
@@ -335,6 +296,12 @@ mid-gradient.
 using ReparameterisedDistributions, Distributions
 
 to_native(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
+```
+
+```@example
+using ReparameterisedDistributions, Distributions
+
+to_native(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) === nothing
 ```
 
 # See also
@@ -370,19 +337,23 @@ function _restype(d::Reparameterised, x::Real)
     return promote_type(eltype(d.vals), typeof(float(x)))
 end
 
-# The two density methods are the sampler's hot path, and the only ones that
-# guard: an invalid point yields `-Inf` (a zero density) rather than an error
-# raised mid-gradient, which is the whole point of `check_args = false`. Every
-# other method converts, so an invalid distribution has no mean, no quantile and
-# no draw — asking for one raises, which is the honest answer.
-function logpdf(d::Reparameterised, x::Real)
-    _valid(d) || return convert(_restype(d, x), -Inf)
-    return logpdf(native(d), x)
+# The density methods (and `loglikelihood`, below) are the sampler's hot
+# path, and the only ones that guard: an invalid point yields `-Inf` (a zero
+# density) rather than an error raised mid-gradient, which is the whole point
+# of `check_args = false`. Every other method converts through `native`, so
+# an invalid distribution has no mean, no quantile and no draw — asking for
+# one raises, which is the honest answer. These call `to_native` directly
+# rather than `native`, so an invalid point never routes through a throw.
+function logpdf(d::Reparameterised{D, names}, x::Real) where {D, names}
+    nd = to_native(D, Val(names), d.vals)
+    nd === nothing && return convert(_restype(d, x), -Inf)
+    return logpdf(nd, x)
 end
 
-function pdf(d::Reparameterised, x::Real)
-    _valid(d) || return zero(_restype(d, x))
-    return pdf(native(d), x)
+function pdf(d::Reparameterised{D, names}, x::Real) where {D, names}
+    nd = to_native(D, Val(names), d.vals)
+    nd === nothing && return zero(_restype(d, x))
+    return pdf(nd, x)
 end
 
 cdf(d::Reparameterised, x::Real) = cdf(native(d), x)
@@ -415,6 +386,10 @@ Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, native(d))
 # 6-9x speed-up on a batch, and is exact either way since the native
 # distribution does not depend on `x`.
 #
+# Guards the same way `logpdf` does: an invalid point gives `-Inf` rather
+# than either throwing (via `native`) or silently bypassing the guard
+# entirely, which the equivalent method did before this check existed.
+#
 # Restricted to `F = Univariate` (every family registered today) rather
 # than left generic over `F`, because `Univariate` is itself a type alias
 # for `ArrayLikeVariate{0}`: a fully generic method here would be
@@ -425,7 +400,9 @@ Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, native(d))
 function loglikelihood(
         d::Reparameterised{D, names, N1, T, Univariate},
         x::AbstractArray{<:Real, M}) where {D, names, N1, T, M}
-    return loglikelihood(native(d), x)
+    nd = to_native(D, Val(names), d.vals)
+    nd === nothing && return convert(_restype(d, zero(eltype(x))), -Inf)
+    return loglikelihood(nd, x)
 end
 
 function Base.show(io::IO, d::Reparameterised{D, names}) where {D, names}

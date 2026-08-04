@@ -1,9 +1,11 @@
 # The numeric seam: a family with no exact closed form still registers
-# exactly one `to_native` method and one `valid_moments` method, the same
-# contract as an analytic family, and calls `solve_moment` inside its own
-# `to_native` body to run a scalar root-find over a monotone moment
-# equation. No trait, no registry: an unregistered pair reaches the 3-arg
-# `to_native` fallback in Reparameterised.jl by ordinary dispatch.
+# exactly one `to_native` method, the same contract as an analytic family,
+# and calls `solve_moment` inside its own `to_native` body to run a scalar
+# root-find over a monotone moment equation. The method still guards its own
+# validity first — including the window the root-find can actually solve —
+# and returns `nothing` rather than reaching the solver on an invalid point.
+# No trait, no registry: an unregistered pair reaches the 3-arg `to_native`
+# fallback in Reparameterised.jl by ordinary dispatch.
 #
 # This file owns the driver (`solve_moment`), the derivative rule that
 # keeps the whole thing differentiable regardless of what the solver
@@ -93,7 +95,6 @@ solve_moment(Gamma, Val((:shape,)), (s, vals) -> exp(s) - vals[1],
 
 # See also
 - [`to_native`](@ref): the conversion a numeric family calls this from.
-- [`valid_moments`](@ref): the guard a numeric family also needs.
 "
 function solve_moment(::Type{D}, ::Val{names}, residual::R, deriv::G,
         bracket::B, vals) where {D, names, R, G, B}
@@ -128,8 +129,8 @@ end
 # --- The three ways a numeric conversion fails cleanly -----------------------
 #
 # (a), moments outside a family's numerically solvable window, is handled by
-# the existing `valid_moments` machinery a numeric family adds a method for,
-# unchanged in kind from the analytical families. (b) and (c) are below.
+# `to_native` itself returning `nothing` before the solve runs — the same
+# guard-first contract as an analytical family. (b) and (c) are below.
 
 # (b) The moment equation does not change sign over the registered bracket:
 # throw before the solver runs, so the message names the family and the

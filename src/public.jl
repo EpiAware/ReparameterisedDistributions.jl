@@ -6,10 +6,9 @@
 # types are public.
 public AbstractReparameterisedDistribution, Reparameterised
 
-# `valid_moments` and `solve_moment` are the two hooks a family registers
-# alongside `to_native`: `valid_moments` for every family, `solve_moment`
-# called from within `to_native` for a family with no exact closed form.
-public valid_moments, solve_moment
+# `solve_moment` is the driver a family with no exact closed form calls from
+# within its own `to_native` method.
+public solve_moment
 
 # `to_native` (the per-family extension point) and `native` (the wrapper-level
 # accessor) are exported instead of merely public — see the main module file
