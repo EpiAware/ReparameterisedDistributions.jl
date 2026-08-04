@@ -209,31 +209,8 @@ end
 "Scenario names broken on every backend."
 broken_scenario_names() = String[]
 
-# The Weibull scenario is the one NUMERIC family (src/numeric.jl): its
-# conversion runs a scalar root-find (Roots.jl, via
-# `ReparameterisedDistributionsRootsExt`) rather than exact algebra.
-# ForwardDiff and ReverseDiff are unaffected (the implicit-function-theorem
-# correction supplies the derivative regardless of how the root itself was
-# found — see `_primal` in src/numeric.jl), but Enzyme and Mooncake trace
-# INTO Roots' own internals when building a reverse-mode rule for the
-# solve, and fail there: measured, `Enzyme.Compiler.IllegalTypeAnalysisException`
-# for Enzyme reverse, a rule-derivation error for Mooncake reverse.
-# Recorded here rather than left to crash `task test-ad`; a follow-up can
-# apply the same `_primal`-stripping / `EnzymeRules.inactive` /
-# `Mooncake.@zero_derivative` treatment `_solve_moment_equation` already
-# gets for ForwardDiff to the forward variants too, once actually run and
-# confirmed to need it (untested here, so conservatively marked broken
-# alongside their reverse-mode counterparts rather than assumed to pass).
 "Per-backend broken scenario names (`Dict{String, Set{String}}`)."
-function backend_broken_scenarios()
-    weibull = "Weibull(mean, sd) loglik"
-    return Dict(
-        "Enzyme forward" => Set([weibull]),
-        "Enzyme reverse" => Set([weibull]),
-        "Mooncake reverse" => Set([weibull]),
-        "Mooncake forward" => Set([weibull])
-    )
-end
+backend_broken_scenarios() = Dict{String, Set{String}}()
 
 "Per-backend scenario names too unstable to run at all."
 backend_skip_scenarios() = Dict{String, Set{String}}()
