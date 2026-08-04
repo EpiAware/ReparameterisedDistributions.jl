@@ -44,10 +44,8 @@ const QA_CONFIG = (
     #      expect_phantoms = false,    # true if a third party adds phantoms
     #      broken = false)             # true to quarantine a known ambiguity
     extensions = (
-        (; name = :ReparameterisedDistributionsRootsExt,
-            triggers = ("Roots",),
-            prefixes = ("ReparameterisedDistributions", "Roots")),
         (; name = :ReparameterisedDistributionsForwardDiffExt,
-            triggers = ("ForwardDiff",),
-            prefixes = ("ReparameterisedDistributions", "ForwardDiff")))
+        triggers = ("ForwardDiff",),
+        prefixes = ("ReparameterisedDistributions", "ForwardDiff")),
+    )
 )
