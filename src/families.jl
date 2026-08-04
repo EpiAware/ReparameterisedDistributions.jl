@@ -310,8 +310,24 @@ end
 # keeps a comfortable margin above that measured edge while still reaching
 # CVs many orders of magnitude past anything epidemiologically meaningful
 # (see `_weibull_cv_max` below).
+#
+# `shape_max` is tighter than the residual equation's own overflow bound
+# for a reason found only by execution: `dF/ds -> 0` as `shape -> Inf` (the
+# CV-vs-shape curve flattens there), so a solve whose RESIDUAL passes
+# `_check_solved`'s tolerance can still sit on a shape whose actual CV
+# misses the request by far more than that tolerance implies. Measured
+# directly, cross-checked against an independent BigFloat solve of the
+# same equation: at `shape_max = 1e6`, `mean = 1.0, sd = cv_min * 1.001`
+# recovers `std(d)` with a relative error of `7e-5`, not the
+# `sqrt(eps(Float64)) ~ 1.5e-8` the residual check promises. Swept over
+# 10,000 (mean, cv) pairs at the domain's own edge, `shape_max = 5_000`
+# keeps the worst recovered `std` relative error at `3.5e-9`, safely
+# inside that promised tolerance end to end, while still reaching CVs down
+# to about `2.6e-4` — many orders of magnitude past anything
+# epidemiologically meaningful. The equivalent issue does not arise at
+# `shape_min`: `dF/ds` grows, not shrinks, as `shape -> 0`.
 _weibull_shape_min(::Type{T}) where {T} = T(0.0125)
-_weibull_shape_max(::Type{T}) where {T} = T(1e6)
+_weibull_shape_max(::Type{T}) where {T} = T(5_000.0)
 
 function _moment_bracket(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
     T = eltype(vals)
@@ -336,7 +352,9 @@ end
 # LOWER: a CV below the value attained at `shape_max` has no root inside
 # the bracket. `pi / (sqrt(6) * shape_max)` is the large-shape asymptote
 # `cv ~ pi / (sqrt(6) * shape)`, accurate to better than 1e-4 relative here.
-_weibull_cv_min(::Type{T}) where {T} = T(pi) / (sqrt(T(6)) * _weibull_shape_max(T))
+function _weibull_cv_min(::Type{T}) where {T}
+    return T(pi) / (sqrt(T(6)) * _weibull_shape_max(T))
+end
 
 # UPPER: the CV attained at `shape_min`, computed via the exact relation
 # the residual equation encodes (the small-shape asymptote used above for

@@ -157,6 +157,6 @@ function _check_solved(::Type{D}, ::Val{names}, s, vals) where {D, names}
     abs(r) <= _moment_atol(float(typeof(r))) && return nothing
     throw(DomainError(vals,
         "the numeric conversion of $(D) by $(collect(names)) did not " *
-        "converge: residual $(r) at shape parameter $(exp(s)), " *
+        "converge: residual $(r) at solved value $(s), " *
         "tolerance $(_moment_atol(float(typeof(r))))"))
 end
