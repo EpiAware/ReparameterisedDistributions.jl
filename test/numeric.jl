@@ -58,20 +58,20 @@ end
     @test logpdf(d, 7.0) ≈ logpdf(nd, 7.0)
 end
 
-# --- A numeric family registers exactly to_native + valid_moments -------
+# --- A numeric family registers exactly to_native ------------------------
 
-@testitem "A numeric family needs only to_native (via solve_moment) and valid_moments" begin
+@testitem "A numeric family needs only to_native (via solve_moment)" begin
     using Distributions
     import ReparameterisedDistributions: solve_moment
 
     # A test-only registration on `Gamma(mean, sdnumeric)`, a pair with no
-    # existing method, using the exact two-hook contract every family uses
-    # — analytic or numeric alike: one `to_native` method (calling
-    # `solve_moment` inside its body here) and one `valid_moments` method.
-    # No trait, no extra registration. Solved directly (shape = mean^2 /
-    # sd^2 is exact), so this is a driver oracle rather than a test of
-    # solver correctness: the numeric answer can be cross-checked against
-    # the true `Gamma(mean, sd)` closed form.
+    # existing method, using the single-hook contract every family uses —
+    # analytic or numeric alike: one `to_native` method, guarding its own
+    # validity first and calling `solve_moment` inside its body here once
+    # that guard passes. No trait, no extra registration. Solved directly
+    # (shape = mean^2 / sd^2 is exact), so this is a driver oracle rather
+    # than a test of solver correctness: the numeric answer can be
+    # cross-checked against the true `Gamma(mean, sd)` closed form.
     _residual(s, vals) = s - log(vals[1]^2 / vals[2]^2)
     _deriv(s, vals) = one(s)
     _bracket(pvals) = (eltype(pvals)(-20.0), eltype(pvals)(20.0))
@@ -79,16 +79,11 @@ end
     function ReparameterisedDistributions.to_native(
             ::Type{Gamma}, ::Val{(:mean, :sdnumeric)}, vals)
         m, sd = vals
+        (m > 0 && sd > 0) || return nothing
         s = solve_moment(Gamma, Val((:mean, :sdnumeric)), _residual, _deriv,
             _bracket, vals)
         shape = exp(s)
         return Gamma(shape, m / shape; check_args = false)
-    end
-
-    function ReparameterisedDistributions.valid_moments(
-            ::Type{Gamma}, ::Val{(:mean, :sdnumeric)}, vals)
-        m, sd = vals
-        return m > 0 && sd > 0
     end
 
     for cv in (0.05, 0.2, 1.0, 3.0, 5.0)

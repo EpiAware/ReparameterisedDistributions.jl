@@ -35,15 +35,15 @@ form once the shape is known. The shape is found by a bracketing
 root-find rather than exact algebra — a change to the package's own
 architecture, not merely a new family:
 
-- A family with no exact closed form registers exactly the same two hooks
-  as an analytic family — one `to_native` method and one `valid_moments`
-  method — and calls the new public `solve_moment(D, Val(names), residual,
-  deriv, bracket, vals)` from inside its own `to_native` body. There is no
-  separate trait or registry: a family's own `to_native` method is always
-  more specific than the generic "no reparameterisation is registered"
-  fallback, so ordinary dispatch reaches it whenever one is registered,
-  and registering a closed form later for a currently-numeric pair is a
-  plain method redefinition.
+- A family with no exact closed form registers exactly the same single
+  `to_native` method as an analytic family, guarding its own validity
+  first, and calls the new public `solve_moment(D, Val(names), residual,
+  deriv, bracket, vals)` from inside its body once that guard passes.
+  There is no separate trait or registry: a family's own `to_native`
+  method is always more specific than the generic "no reparameterisation
+  is registered" fallback, so ordinary dispatch reaches it whenever one is
+  registered, and registering a closed form later for a currently-numeric
+  pair is a plain method redefinition.
 - The actual root-find lives in a new package extension,
   `ReparameterisedDistributionsRootsExt` (Roots.jl), kept out of the core
   package per the maintainer's ruling that this package owns the equation
@@ -84,33 +84,50 @@ architecture, not merely a new family:
   matters most for a numeric one, where each reconversion re-runs a
   root-find.
 
-### A two-hook registration surface: `to_native` and `valid_moments`
+### Breaking: a single registration hook, `to_native`
 
-Registering a family — analytic or numeric — now needs exactly two public
-methods, not the half-private mix the numeric conversion above briefly
-required:
+**`to_native(D, Val(names), vals)` now returns `Union{Nothing, D}`, not
+always `D`.** `nothing` means the parameters describe no member of the
+family. This is a breaking change to an exported function's return type,
+released as 0.2.0 rather than a patch, per SemVer 0.x.
 
-- `valid_moments(D, Val(names), vals)::Bool`, promoted to `public` (the
-  former `_valid_moments`), states a family's constraints once; the guard
-  `logpdf`/`pdf` and construction under `check_args = true` both consult.
-  `const _valid_moments = valid_moments` is kept for one release, so a
-  downstream package that added a method under the old private name still
-  works.
-- `solve_moment(D, Val(names), residual, deriv, bracket, vals)`, new and
-  `public`, is the numeric driver a family with no exact closed form calls
-  from inside its own `to_native` method, passing its moment equation,
-  derivative and bracket as ordinary functions. This registers no method
-  on anything of this package's own: a numeric family's registration
-  footprint is identical in shape to an analytic one, one `to_native`
-  method and one `valid_moments` method.
+Registering a family — analytic or numeric — needs exactly this one public
+method. `valid_moments`, briefly public, is deleted, along with the
+`_valid_moments` compat alias promised to keep working for one release: the
+promise is broken a release early rather than shipped and immediately
+superseded. A family's guard moves into the start of its own `to_native`
+method, checked before any other work — in particular before a `sqrt` or
+similar that would otherwise throw on invalid input instead of reporting it.
 
-Deleted outright: the `_conversion_kind` trait, the `Analytic`/`Numeric`
-marker types, and the four private hooks a numeric family previously had
-to add methods to (`_moment_residual`, `_moment_residual_deriv`,
-`_moment_bracket`, `_from_solution`). None of them were an irreducible
-extension point — a family's own `to_native` method was already strictly
-more specific than the generic fallback, so it was always chosen by
-ordinary dispatch regardless of the trait.
+`native(d)` is unaffected in its own return type: it still unwraps to the
+concrete native distribution and throws a `DomainError` on `nothing`, so
+`@inferred native(d)` keeps passing and the allocation and timing profile is
+unchanged. What is lost is the diagnostic of asking `native` for the
+distribution an *invalid* wrapper would have converted to — checking that
+now needs `to_native` directly, and reads `=== nothing` rather than a
+distribution.
+
+`solve_moment(D, Val(names), residual, deriv, bracket, vals)`, unaffected,
+remains the numeric driver a family with no exact closed form calls from
+inside its own `to_native` method, once its own guard has passed. This
+registers no method on anything of this package's own: a numeric family's
+registration footprint is identical in shape to an analytic one, one
+`to_native` method.
+
+Also fixed: `loglikelihood(d::Reparameterised, x::AbstractArray)` did not
+guard at all, so a batch of observations against an invalid wrapper (built
+with `check_args = false`) silently bypassed the whole validity contract —
+the scalar `logpdf` path returned `-Inf`, the batched path did not. The
+single hook makes this gap impossible to leave open: `nothing` cannot be
+passed to `Distributions.loglikelihood`, so the branch has to be written.
+
+Deleted outright, from the two-hook design above: the `_conversion_kind`
+trait, the `Analytic`/`Numeric` marker types, and the four private hooks a
+numeric family previously had to add methods to (`_moment_residual`,
+`_moment_residual_deriv`, `_moment_bracket`, `_from_solution`). None of them
+were an irreducible extension point — a family's own `to_native` method was
+already strictly more specific than the generic fallback, so it was always
+chosen by ordinary dispatch regardless of the trait.
 
 ### `rescale`: scale a registered moment while holding the others fixed
 
