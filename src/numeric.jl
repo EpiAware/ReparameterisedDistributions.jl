@@ -9,9 +9,10 @@
 #
 # This file owns the driver (`solve_moment`), the derivative rule that
 # keeps the whole thing differentiable regardless of what the solver
-# returns, and the three ways a numeric conversion fails cleanly. The
-# root-find itself is supplied by a package extension
-# (`_solve_moment_equation` below), so no solver ships in this package.
+# returns, and the three ways a numeric conversion fails cleanly. Roots.jl
+# does the root-find itself (`_solve_moment_equation` below), kept as a
+# package-owned one-liner so an AD backend that cannot trace Roots'
+# internals has something of ours to mark inactive.
 
 # --- Stripping AD wrapper types for the solve itself ------------------------
 #
@@ -46,7 +47,8 @@ _primal(x::Real) = x
 @doc raw"
 
 Solve a family's own moment equation for a scalar `s`, exactly and
-differentiably, regardless of which solver backend runs the root-find.
+differentiably: the root is found numerically, but its derivative comes
+from the implicit-function-theorem correction rather than from the solve.
 
 A numeric family calls this inside its own [`to_native`](@ref) method,
 passing its own `residual`, `deriv` and `bracket` as ordinary functions —
@@ -110,21 +112,9 @@ function solve_moment(::Type{D}, ::Val{names}, residual::R, deriv::G,
     return s
 end
 
-# --- The solver seam ---------------------------------------------------------
-#
-# The only thing this package does not do itself. A package extension adds a
-# strictly more specific method (`lo::Real, hi::Real` beats the `Any, Any`
-# here), so loading it takes over by ordinary dispatch — no registry, no
-# mutable global, no `hasmethod` at run time, no method-overwrite warning.
-# Deliberately no solver-type argument and no `solver =` keyword: with a
-# single backend shipped that would be a knob nobody threads through.
-function _solve_moment_equation(f, lo, hi)
-    throw(ArgumentError(
-        "this parameterisation is converted by a scalar root-find, " *
-        "and no solver backend is loaded; add Roots.jl to your " *
-        "project and `using Roots` to load " *
-        "ReparameterisedDistributionsRootsExt, which supplies it"))
-end
+# The solve itself, as one package-owned function so a backend that cannot
+# trace Roots' bisection can be told to treat it as a constant.
+_solve_moment_equation(f, lo, hi) = find_zero(f, (lo, hi), A42())
 
 # --- The three ways a numeric conversion fails cleanly -----------------------
 #

@@ -40,6 +40,8 @@ using DocStringExtensions: @template, DOCSTRING, EXPORTS, IMPORTS, TYPEDEF,
 # already in this package's dependency closure through Distributions, so
 # this costs no new install and no new transitive package.
 using SpecialFunctions: digamma, loggamma
+# The bracketing root-find src/numeric.jl runs.
+using Roots: A42, find_zero
 
 # Functions we extend for the wrapper.
 import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,

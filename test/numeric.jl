@@ -4,17 +4,6 @@
 # exact algebra, so these tests exercise the seam itself — `solve_moment`,
 # the implicit-function-theorem correction, the three ways a solve fails
 # cleanly — and not just the Weibull maths.
-#
-# `using Distributions` is enough to load the Roots extension: Distributions
-# hard-depends on Roots, so `Base.loaded_modules` already contains it by the
-# time any test file runs, and Julia's extension mechanism triggers on that
-# regardless of who loaded it. No test here needs an explicit `using Roots`.
-
-@testitem "Weibull(mean, sd): the extension actually loads" begin
-    ext = Base.get_extension(
-        ReparameterisedDistributions, :ReparameterisedDistributionsRootsExt)
-    @test ext !== nothing
-end
 
 @testitem "Weibull(mean, sd): moment recovery sweep" begin
     using Distributions
@@ -219,28 +208,6 @@ end
         @test occursin("did not converge", msg)
         @test occursin("residual", msg)
         @test occursin("tolerance", msg)
-    end
-end
-
-@testitem "No solver backend loaded: the stub's own error" begin
-    # The realistic "no extension loaded" path cannot be produced
-    # in-process: `using Distributions` already loads Roots (it is a hard
-    # Distributions dependency), which triggers
-    # `ReparameterisedDistributionsRootsExt` regardless of who asked for
-    # it, so the extension is always active by the time any test runs.
-    # This asserts directly on the stub method instead, with argument
-    # types (`Nothing, Nothing`) that only the core's generic
-    # `(f, lo, hi)` method — not the extension's `(f, lo::Real, hi::Real)`
-    # — can match.
-    @test_throws ArgumentError ReparameterisedDistributions._solve_moment_equation(
-        identity, nothing, nothing)
-    try
-        ReparameterisedDistributions._solve_moment_equation(
-            identity, nothing, nothing)
-    catch e
-        msg = sprint(showerror, e)
-        @test occursin("Roots", msg)
-        @test occursin("ReparameterisedDistributionsRootsExt", msg)
     end
 end
 
