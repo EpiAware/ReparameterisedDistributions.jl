@@ -1,17 +1,29 @@
 name = "ReparameterisedDistributions"
 uuid = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
 authors = ["Sam Abbott", "Michael DeWitt"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+
+[weakdeps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+
+[extensions]
+ReparameterisedDistributionsForwardDiffExt = "ForwardDiff"
+ReparameterisedDistributionsRootsExt = "Roots"
 
 [compat]
 Distributions = "0.25"
 DocStringExtensions = "0.9"
+ForwardDiff = "0.10, 1"
 Random = "1"
+Roots = "2.2, 3"
+SpecialFunctions = "2"
 julia = "1.11, 1.12"
 
 [workspace]

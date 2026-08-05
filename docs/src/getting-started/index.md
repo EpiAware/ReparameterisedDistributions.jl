@@ -72,13 +72,28 @@ Asking for one raises.
 | `Beta` | `mean`, `var` | as above, given the variance |
 | `InverseGaussian` | `mean`, `sd` | `lambda = mean³ / var`; the mean is native |
 | `InverseGaussian` | `mean`, `var` | as above, given the variance |
+| `Weibull` | `mean`, `sd` | numeric: the CV pins the shape by a scalar root-find; the scale then follows in closed form |
+| `Weibull` | `mean`, `var` | as above, given the variance |
 
-Registering a family from another package is not supported yet: the
-conversion hook is public but the validity guard is still internal, so the
-contract is not one an external package can rely on. See
-[#80](https://github.com/EpiAware/ReparameterisedDistributions.jl/issues/80).
+`Weibull(mean, sd)` has no exact closed form.
+The coefficient of variation depends on the shape alone, through a strictly
+monotone one-dimensional equation that a bracketing root-find solves, with
+the scale then following in closed form.
+The gradient is still exact: the root's derivative is recovered afterwards by
+an implicit-function-theorem correction rather than by differentiating through
+the solver.
 
-The [Public API](@ref public-api) documents what is supported today.
+Registering a family, analytic or numeric, needs exactly one `to_native`
+method: the conversion, guarding its own validity first and returning
+`nothing` for a value its parameters cannot describe. A family with no exact
+closed form calls `solve_moment` from inside its own `to_native`, passing
+its moment equation, its derivative and a bracket as ordinary functions,
+after the same guard.
+
+Register the method under the parameter names sorted alphabetically:
+`reparameterise` canonicalises its keywords that way before dispatching, so
+a method registered under `Val((:sd, :mean))` is never found. The
+[Public API](@ref public-api) documents the hook.
 
 ## Rescaling a moment
 

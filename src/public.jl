@@ -6,6 +6,10 @@
 # types are public.
 public AbstractReparameterisedDistribution, Reparameterised
 
+# `solve_moment` is the driver a family with no exact closed form calls from
+# within its own `to_native` method.
+public solve_moment
+
 # `to_native` (the per-family extension point) and `native` (the wrapper-level
 # accessor) are exported instead of merely public — see the main module file
 # — because, unlike this package's other internals, a caller is expected to

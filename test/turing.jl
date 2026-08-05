@@ -59,3 +59,32 @@ end
     @test mean(chain[:m])≈8.0 rtol=0.15
     @test mean(chain[:s])≈2.0 rtol=0.3
 end
+
+@testitem "Turing: the numeric fallback works on the right of ~" tags=[
+    :turing] begin
+    using Distributions, Turing, Random
+
+    # The same shape as the LogNormal tests above, but through the
+    # solver-backed Weibull conversion rather than a closed form — the
+    # gradient with respect to the moments has to be right for NUTS to
+    # sample at all.
+    @model function delays(x)
+        m ~ LogNormal(2.0, 0.5)
+        s ~ truncated(Normal(2.0, 1.0); lower = 0.1)
+        for i in eachindex(x)
+            x[i] ~ reparameterise(Weibull; mean = m, sd = s,
+                check_args = false)
+        end
+    end
+
+    obs = rand(Xoshiro(1),
+        native(
+            reparameterise(Weibull; mean = 8.0, sd = 2.0)), 200)
+
+    chain = sample(Xoshiro(2), delays(obs), NUTS(), 200; progress = false)
+
+    @test :m in names(chain, :parameters)
+    @test :s in names(chain, :parameters)
+    @test mean(chain[:m])≈8.0 rtol=0.15
+    @test mean(chain[:s])≈2.0 rtol=0.3
+end
