@@ -100,7 +100,10 @@ which matters on the hot path a gradient runs through, not only for style.
 Register both methods under the parameter names sorted alphabetically:
 `reparameterise` canonicalises its keywords that way before dispatching, so
 a method registered under `Val((:sd, :mean))` is never found. The
-[Public API](@ref public-api) documents both hooks.
+[Public API](@ref public-api) documents both hooks, and
+[Adding a reparameterisation](@ref adding-a-reparameterisation) is the full
+contract, with a worked example and the test suite a registration is
+checked against.
 
 ### Migrating a family registered against v0.2.0
 
@@ -149,6 +152,8 @@ rather than applying the factor under different semantics.
 - Work through [Priors on moments](@ref priors-on-moments) to see what a
   prior on a moment implies in native coordinates, and how to fit one.
 - Want the full interface? See the [Public API](@ref public-api).
+- Registering a family of your own? See
+  [Adding a reparameterisation](@ref adding-a-reparameterisation).
 - Want to report a problem or ask a question? Open an issue or start a
   discussion on the [GitHub repository](https://github.com/EpiAware/ReparameterisedDistributions.jl).
 

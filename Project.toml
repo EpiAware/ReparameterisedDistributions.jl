@@ -12,10 +12,12 @@ SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 [weakdeps]
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [extensions]
 ReparameterisedDistributionsForwardDiffExt = "ForwardDiff"
 ReparameterisedDistributionsRootsExt = "Roots"
+ReparameterisedDistributionsTestExt = "Test"
 
 [compat]
 Distributions = "0.25"
@@ -24,6 +26,7 @@ ForwardDiff = "0.10, 1"
 Random = "1"
 Roots = "2.2, 3"
 SpecialFunctions = "2"
+Test = "1"
 julia = "1.11, 1.12"
 
 [workspace]

@@ -25,6 +25,12 @@ pages = [
             "Automatic differentiation backends" => "getting-started/tutorials/ad-backends.md"
         ]
     ],
+    # Developer-facing pages: the extension contract a new parameterisation
+    # is registered against, and how a registration is tested — here or from
+    # another package.
+    "Developer" => [
+        "Adding a reparameterisation" => "developer/adding-a-reparameterisation.md"
+    ],
     "API reference" => [
         "Public API" => "lib/public.md",
         "Internal API" => "lib/internals.md"
