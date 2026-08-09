@@ -54,10 +54,10 @@ using Distributions: Distributions, Distribution, Beta, Exponential, Gamma,
 # are defined (see src/docstrings.jl).
 include("docstrings.jl")
 
-# The verbs, and the two conversion functions, are exported; the wrapper type
-# and its supertype are public but not exported (see public.jl), following
-# the ecosystem convention.
-export reparameterise, rescale, to_native, native
+# The verbs, and the family-registration hooks (the conversion and its
+# guard), are exported; the wrapper type and its supertype are public but not
+# exported (see public.jl), following the ecosystem convention.
+export reparameterise, rescale, to_native, valid_moments, native
 
 # The abstract supertype, then the concrete wrapper and its front door, then
 # the numeric fallback the front door dispatches to when no closed form is

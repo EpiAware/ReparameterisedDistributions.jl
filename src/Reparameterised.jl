@@ -211,13 +211,68 @@ function _build(::Type{D}, ::Val{names},
     pvals = promote(map(float, cvals)...)
     d = _reparameterised(D, cnames, pvals)
     if check_args
-        nd = to_native(D, Val(cnames), pvals)
-        nd === nothing && throw(DomainError(pvals,
+        valid_moments(D, Val(cnames), pvals) || throw(DomainError(pvals,
             "invalid $(collect(cnames)) for $(D)"))
-        _check_native(nd)
+        _check_native(to_native(D, Val(cnames), pvals))
     end
     return d
 end
+
+# The docstring below must stay immediately adjacent to the function it
+# documents: even a comment between them silently detaches it (verified —
+# Aqua's undocumented-names check is what catches this).
+@doc raw"
+
+Whether a family's alternative parameters describe a member of the family,
+answered without converting or throwing.
+
+Checked BEFORE [`to_native`](@ref) at every call site, hot path and
+construction alike — a family's own `to_native` method assumes its input has
+already passed this check, and is free to build whatever it builds without
+guarding, so it always returns a concrete distribution rather than a
+`Union` of one and `nothing`. Keeping that return type concrete is not
+cosmetic: an AD-hot call site that instead bound a
+`Union{Nothing, <native type>}`-typed conversion result has produced a
+silently wrong reverse-mode gradient in this package before, with no error
+and no warning (see `NEWS.md`); a family's own math never has to defend
+against that on its own so long as it registers a truthful predicate here.
+
+`nothing` cannot be recovered from the native distribution's own type: some
+conversions are even in the invalid direction (the LogNormal and Gamma
+conversions square the standard deviation, so a negative one builds exactly
+the same, perfectly valid native distribution as its positive counterpart),
+so the check has to happen in the alternative parameters' own coordinates,
+in a method registered here, before [`to_native`](@ref) runs.
+
+Each supported (family, parameter-name) pair adds a method alongside its
+[`to_native`](@ref) registration. The 3-arg fallback accepts anything, so a
+family that registers `to_native` without a matching `valid_moments` method
+is treated as always valid — the failure then surfaces from `to_native`
+itself, or from the native family's own argument check at construction.
+
+# Arguments
+- the native family being checked for.
+- `Val(names)`: the alternative parameter names, as a value type so the
+  check is resolved at compile time.
+- `vals`: the alternative parameter values, in `names` order.
+
+# Examples
+```@example
+using ReparameterisedDistributions, Distributions
+
+valid_moments(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
+```
+
+```@example
+using ReparameterisedDistributions, Distributions
+
+valid_moments(LogNormal, Val((:mean, :sd)), (8.0, -1.0))
+```
+
+# See also
+- [`to_native`](@ref): the conversion this guards, registered alongside it.
+"
+valid_moments(::Type{D}, ::Val{names}, vals) where {D, names} = true
 
 # Force the native conversion through the family's own argument checks once,
 # at construction. `to_native` itself builds with `check_args = false` so it
@@ -237,7 +292,7 @@ Every density, moment and sampling method on a `Reparameterised` goes through
 this, so it is also the way to reach the native parameters — the ones the
 wrapped family was actually built from — when the moments alone are not
 enough: `params(native(d))` rather than `params(d)`. Throws a `DomainError`
-if `d`'s parameters are invalid — see [`to_native`](@ref).
+if `d`'s parameters are invalid — see [`valid_moments`](@ref).
 
 # Examples
 ```@example
@@ -249,12 +304,12 @@ native(d), params(native(d))
 
 # See also
 - [`to_native`](@ref): the per-family closed form this dispatches to.
+- [`valid_moments`](@ref): the per-family guard checked first.
 "
 function native(d::Reparameterised{D, names}) where {D, names}
-    nd = to_native(D, Val(names), d.vals)
-    nd === nothing && throw(DomainError(d.vals,
+    valid_moments(D, Val(names), d.vals) || throw(DomainError(d.vals,
         "invalid $(collect(names)) for $(D)"))
-    return nd
+    return to_native(D, Val(names), d.vals)
 end
 
 # A family's own `to_native` method — analytic or numeric, calling
@@ -267,24 +322,24 @@ end
 @doc raw"
 
 The closed-form conversion from a family's alternative parameters to the
-native distribution, or `nothing` if the parameters describe no member of
-the family.
+native distribution.
 
 Each supported (family, parameter-name) pair adds a method. A method should
 be exact algebra where a closed form exists, and otherwise call
-[`solve_moment`](@ref). It must check its own parameters'
-validity BEFORE doing anything with them (in particular before a `sqrt` or
-similar, which would throw on invalid input rather than reporting it as
-`nothing`), and must build the native distribution with `check_args = false`,
-so the conversion stays differentiable and a sampler probing an invalid point
-yields `-Inf` rather than throwing mid-gradient.
+[`solve_moment`](@ref). It must build the native distribution with
+`check_args = false`, so the conversion stays differentiable and a sampler
+probing an invalid point yields `-Inf` rather than throwing mid-gradient.
 
-`nothing` cannot be recovered from the native distribution's own type: some
-conversions are even in the invalid direction (the LogNormal and Gamma
-conversions square the standard deviation, so a negative one builds exactly
-the same, perfectly valid native distribution as its positive counterpart),
-so the check has to happen in the alternative parameters' own coordinates,
-inside this method, before the conversion runs.
+A method does NOT need to guard its own input: [`valid_moments`](@ref) is
+checked at every call site first, so this always runs on parameters already
+known valid and always returns a concrete `D`, never a `Union` of one and
+`nothing`. Keep it that way — do not add an early `return nothing` here.
+That split, not a stylistic preference, is why this stays two methods
+rather than one: an AD-hot call site that bound a `Union{Nothing, D}`-typed
+conversion result has produced a silently wrong reverse-mode gradient in
+this package before (see `NEWS.md`), and a call site here can only avoid
+that failure mode if every registered `to_native` method is unconditionally
+concrete.
 
 # Arguments
 - the native family being converted to.
@@ -299,15 +354,10 @@ using ReparameterisedDistributions, Distributions
 to_native(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
 ```
 
-```@example
-using ReparameterisedDistributions, Distributions
-
-to_native(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) === nothing
-```
-
 # See also
 - [`reparameterise`](@ref): the public constructor that dispatches to this.
 - [`native`](@ref): the wrapper-level accessor most callers want instead.
+- [`valid_moments`](@ref): the guard checked before this runs.
 "
 function to_native(::Type{D}, ::Val{names}, vals) where {D, names}
     throw(ArgumentError(
@@ -343,17 +393,24 @@ end
 # density) rather than an error raised mid-gradient, which is the whole point
 # of `check_args = false`. Every other method converts through `native`, so
 # an invalid distribution has no mean, no quantile and no draw — asking for
-# one raises, which is the honest answer. These call `to_native` directly
-# rather than `native`, so an invalid point never routes through a throw.
+# one raises, which is the honest answer. These check `valid_moments` and
+# call `to_native` directly rather than `native`, so an invalid point never
+# routes through a throw.
+#
+# `valid_moments` is checked and branched on BEFORE `to_native` runs, never
+# after: `nd` below is always a concretely-typed `D`, never bound as
+# `Union{Nothing, D}`. Do not collapse this back into a single call that
+# branches on `to_native`'s result — see `to_native`'s own docstring for why.
 function logpdf(d::Reparameterised{D, names}, x::Real) where {D, names}
+    valid_moments(D, Val(names), d.vals) ||
+        return convert(_restype(d, x), -Inf)
     nd = to_native(D, Val(names), d.vals)
-    nd === nothing && return convert(_restype(d, x), -Inf)
     return logpdf(nd, x)
 end
 
 function pdf(d::Reparameterised{D, names}, x::Real) where {D, names}
+    valid_moments(D, Val(names), d.vals) || return zero(_restype(d, x))
     nd = to_native(D, Val(names), d.vals)
-    nd === nothing && return zero(_restype(d, x))
     return pdf(nd, x)
 end
 
@@ -401,8 +458,9 @@ Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, native(d))
 function loglikelihood(
         d::Reparameterised{D, names, N1, T, Univariate},
         x::AbstractArray{<:Real, M}) where {D, names, N1, T, M}
+    valid_moments(D, Val(names), d.vals) ||
+        return convert(_restype(d, zero(eltype(x))), -Inf)
     nd = to_native(D, Val(names), d.vals)
-    nd === nothing && return convert(_restype(d, zero(eltype(x))), -Inf)
     return loglikelihood(nd, x)
 end
 
@@ -420,7 +478,10 @@ function Base.show(io::IO, ::MIME"text/plain",
         d::Reparameterised{D, names}) where {D, names}
     show(io, d)
     print(io, "\n  native: ")
-    nd = to_native(D, Val(names), d.vals)
-    nd === nothing ? print(io, "invalid parameters") : show(io, nd)
+    if valid_moments(D, Val(names), d.vals)
+        show(io, to_native(D, Val(names), d.vals))
+    else
+        print(io, "invalid parameters")
+    end
     return nothing
 end

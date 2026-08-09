@@ -1,9 +1,9 @@
-# The numeric seam: a family with no exact closed form still registers
-# exactly one `to_native` method, the same contract as an analytic family,
-# and calls `solve_moment` inside its own `to_native` body to run a scalar
-# root-find over a monotone moment equation. The method still guards its own
-# validity first — including the window the root-find can actually solve —
-# and returns `nothing` rather than reaching the solver on an invalid point.
+# The numeric seam: a family with no exact closed form still registers the
+# same two methods as an analytic family, `valid_moments` and `to_native`,
+# and calls `solve_moment` inside its `to_native` body to run a scalar
+# root-find over a monotone moment equation. `valid_moments` states its own
+# validity — including the window the root-find can actually solve — so the
+# solver never runs on an invalid point; `to_native` itself does not guard.
 # No trait, no registry: an unregistered pair reaches the 3-arg `to_native`
 # fallback in Reparameterised.jl by ordinary dispatch.
 #
@@ -129,7 +129,7 @@ end
 # --- The three ways a numeric conversion fails cleanly -----------------------
 #
 # (a), moments outside a family's numerically solvable window, is handled by
-# `to_native` itself returning `nothing` before the solve runs — the same
+# `valid_moments` reporting `false` before the solve runs — the same
 # guard-first contract as an analytical family. (b) and (c) are below.
 
 # (b) The moment equation does not change sign over the registered bracket:

@@ -1,54 +1,78 @@
 # Closed-form conversions from a family's alternative parameters to its native
 # ones. Each is exact algebra, so it is differentiable and adds no solver. The
-# native distribution is built with `check_args = false`; a method returns
-# `nothing` instead of a distribution for an invalid point, checked before any
-# other work, so an invalid point gives `-Inf` rather than an error raised
-# mid-gradient.
+# native distribution is built with `check_args = false`; validity is decided
+# in moment coordinates by `valid_moments`, checked at every call site BEFORE
+# `to_native` runs, so an invalid point yields `-Inf` rather than an error
+# raised mid-gradient, and `to_native` itself never has to guard.
 
 # LogNormal by the mean and standard deviation of the distribution itself,
 # rather than of its logarithm. Inverting the log-normal moments,
 #   mean = exp(mu + sigma^2 / 2),  var = mean^2 * (exp(sigma^2) - 1)
 # gives sigma^2 = log1p((sd / mean)^2) and mu = log(mean) - sigma^2 / 2.
 # `log1p` keeps the small-`sd / mean` case accurate.
-#
-# A log-normal is supported on the positives, so its mean is positive. The
-# standard deviation must be checked in its own coordinates: the conversion
-# squares `sd / mean`, so a negative one would otherwise build exactly the
-# same, valid native distribution as its positive counterpart.
 function to_native(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    (mean > 0 && sd > 0) || return nothing
     s2 = log1p((sd / mean)^2)
     return LogNormal(log(mean) - s2 / 2, sqrt(s2); check_args = false)
 end
 
-# The same, given the variance instead of the standard deviation. Guards
-# `var > 0` itself, before the `sqrt` below: relying on the delegated call to
-# catch a negative variance would mean the `sqrt` runs first and throws.
+# A log-normal is supported on the positives, so its mean is positive. The
+# standard deviation must be checked in its own coordinates: the conversion
+# squares `sd / mean`, so a negative one would otherwise build exactly the
+# same, valid native distribution as its positive counterpart.
+function valid_moments(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    return mean > 0 && sd > 0
+end
+
+# The same, given the variance instead of the standard deviation.
 function to_native(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    var > 0 || return nothing
     return to_native(LogNormal, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+# Every `(mean, var)` predicate here checks `var > 0` and then DELEGATES to
+# the `(mean, sd)` predicate at `sqrt(var)`, rather than restating the
+# `(mean, sd)` condition in variance coordinates. `&&` short-circuits, so the
+# `sqrt` only runs once `var > 0` and never on a negative input. Delegating
+# matters beyond avoiding a restatement: the `to_native` method above
+# converts through exactly the same `sqrt(var)`, so the predicate then holds
+# on the value the conversion actually sees. Restating a condition such as
+# Beta's `var < mean * (1 - mean)` in variance coordinates can disagree with
+# `sqrt(var)^2 < mean * (1 - mean)` in the last bit, which would admit a
+# point the conversion cannot represent.
+function valid_moments(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return var > 0 && valid_moments(LogNormal, Val((:mean, :sd)),
+        (mean, sqrt(var)))
 end
 
 # Gamma by mean and standard deviation. A Gamma(shape, scale) has
 #   mean = shape * scale,  var = shape * scale^2
 # so scale = var / mean and shape = mean / scale = mean^2 / var.
-#
-# As for the LogNormal, the conversion squares `sd`, so the sign has to be
-# checked here or a negative standard deviation would give a valid — and
-# identical — native distribution.
 function to_native(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    (mean > 0 && sd > 0) || return nothing
     scale = sd^2 / mean
     return Gamma(mean / scale, scale; check_args = false)
 end
 
+# As for the LogNormal, the conversion squares `sd`, so the sign has to be
+# checked here or a negative standard deviation would give a valid — and
+# identical — native distribution.
+function valid_moments(::Type{Gamma}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    return mean > 0 && sd > 0
+end
+
 function to_native(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    var > 0 || return nothing
     return to_native(Gamma, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+function valid_moments(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return var > 0 && valid_moments(Gamma, Val((:mean, :sd)),
+        (mean, sqrt(var)))
 end
 
 # Gamma by mean and shape, which is how a delay is often elicited when the shape
@@ -57,8 +81,12 @@ end
 # CensoredDistributions registered.
 function to_native(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
     mean, shape = vals
-    (mean > 0 && shape > 0) || return nothing
     return Gamma(shape, mean / shape; check_args = false)
+end
+
+function valid_moments(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
+    mean, shape = vals
+    return mean > 0 && shape > 0
 end
 
 # NegativeBinomial by mean and overdispersion, the parameterisation epidemiology
@@ -69,18 +97,22 @@ end
 # native `NegativeBinomial(r, p)` has mean = r(1-p)/p and var = mean/p, giving
 #   r = 1 / a,  p = mean / var = 1 / (1 + a * mean).
 #
-# `a = 0` is the Poisson limit, not a NegativeBinomial: `r = 1 / a` diverges,
-# so it is rejected alongside `a < 0`.
-#
 # Note the family is DISCRETE. The wrapper takes its value support from the
 # family, so this stays a discrete distribution rather than silently becoming a
 # continuous one.
 function to_native(::Type{NegativeBinomial},
         ::Val{(:mean, :overdispersion)}, vals)
     mean, a = vals
-    (mean > 0 && a > 0) || return nothing
     p = 1 / (1 + a * mean)
     return NegativeBinomial(1 / a, p; check_args = false)
+end
+
+# `a = 0` is the Poisson limit, not a NegativeBinomial: `r = 1 / a` diverges,
+# so it is rejected alongside `a < 0`.
+function valid_moments(::Type{NegativeBinomial},
+        ::Val{(:mean, :overdispersion)}, vals)
+    mean, a = vals
+    return mean > 0 && a > 0
 end
 
 # NegativeBinomial by mean and dispersion, the reciprocal of the overdispersion
@@ -97,9 +129,14 @@ end
 function to_native(::Type{NegativeBinomial},
         ::Val{(:dispersion, :mean)}, vals)
     dispersion, mean = vals
-    (dispersion > 0 && mean > 0) || return nothing
     p = dispersion / (dispersion + mean)
     return NegativeBinomial(dispersion, p; check_args = false)
+end
+
+function valid_moments(::Type{NegativeBinomial},
+        ::Val{(:dispersion, :mean)}, vals)
+    dispersion, mean = vals
+    return dispersion > 0 && mean > 0
 end
 
 # Exponential by its rate, the quantity a hazard is usually written over and
@@ -109,8 +146,12 @@ end
 # so the conversion is a single inversion: θ = 1 / rate.
 function to_native(::Type{Exponential}, ::Val{(:rate,)}, vals)
     rate, = vals
-    rate > 0 || return nothing
     return Exponential(1 / rate; check_args = false)
+end
+
+function valid_moments(::Type{Exponential}, ::Val{(:rate,)}, vals)
+    rate, = vals
+    return rate > 0
 end
 
 # Gamma by shape and rate, the reciprocal of the (mean, shape) pair above: the
@@ -121,8 +162,12 @@ end
 # `(:shape, :rate)`: `_canonical` sorts alphabetically, and 'r' < 's'.
 function to_native(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
     rate, shape = vals
-    (rate > 0 && shape > 0) || return nothing
     return Gamma(shape, 1 / rate; check_args = false)
+end
+
+function valid_moments(::Type{Gamma}, ::Val{(:rate, :shape)}, vals)
+    rate, shape = vals
+    return rate > 0 && shape > 0
 end
 
 # SkewNormal by its centre, scale and the probability mass below the centre —
@@ -148,9 +193,14 @@ end
 function to_native(::Type{SkewNormal},
         ::Val{(:centre, :mass_below_centre, :scale)}, vals)
     centre, m, scale = vals
-    (scale > 0 && 0 < m < 1) || return nothing
     alpha = tan(pi * (1 / 2 - m))
     return SkewNormal(centre, scale, alpha; check_args = false)
+end
+
+function valid_moments(::Type{SkewNormal},
+        ::Val{(:centre, :mass_below_centre, :scale)}, vals)
+    centre, m, scale = vals
+    return scale > 0 && 0 < m < 1
 end
 
 # Beta by mean and standard deviation, the natural coordinates for a
@@ -161,21 +211,30 @@ end
 # writing nu = alpha + beta for the concentration. So
 #   nu = mean * (1 - mean) / var - 1,
 #   alpha = mean * nu,  beta = (1 - mean) * nu.
-# `nu > 0` is exactly `var < mean * (1 - mean)`: the variance of any Beta is
-# bounded above by the variance of a Bernoulli with the same mean, so a
-# standard deviation elicited too wide for its mean has no Beta at all, not
-# merely an invalid one, and is rejected rather than silently clipped.
 function to_native(::Type{Beta}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    (0 < mean < 1 && sd > 0 && sd^2 < mean * (1 - mean)) || return nothing
     nu = mean * (1 - mean) / sd^2 - 1
     return Beta(mean * nu, (1 - mean) * nu; check_args = false)
 end
 
+# `nu > 0` is exactly `var < mean * (1 - mean)`: the variance of any Beta is
+# bounded above by the variance of a Bernoulli with the same mean, so a
+# standard deviation elicited too wide for its mean has no Beta at all, not
+# merely an invalid one, and is rejected rather than silently clipped.
+function valid_moments(::Type{Beta}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    return 0 < mean < 1 && sd > 0 && sd^2 < mean * (1 - mean)
+end
+
 function to_native(::Type{Beta}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    var > 0 || return nothing
     return to_native(Beta, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+function valid_moments(::Type{Beta}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return var > 0 && valid_moments(Beta, Val((:mean, :sd)),
+        (mean, sqrt(var)))
 end
 
 # InverseGaussian by mean and standard deviation. The native
@@ -189,15 +248,24 @@ end
 # period.
 function to_native(::Type{InverseGaussian}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    (mean > 0 && sd > 0) || return nothing
     lambda = mean^3 / sd^2
     return InverseGaussian(mean, lambda; check_args = false)
 end
 
+function valid_moments(::Type{InverseGaussian}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
+    return mean > 0 && sd > 0
+end
+
 function to_native(::Type{InverseGaussian}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    var > 0 || return nothing
     return to_native(InverseGaussian, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+function valid_moments(::Type{InverseGaussian}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return var > 0 && valid_moments(InverseGaussian, Val((:mean, :sd)),
+        (mean, sqrt(var)))
 end
 
 # Weibull by mean and standard deviation. Unlike every family above, this has
@@ -282,8 +350,8 @@ end
 
 # Both bounds are the CV attained at the registered bracket's ends, so they
 # are derived from the bracket rather than hand-tuned; a sampler exploring
-# an unconstrained `sd` gets `-Inf` from this guard rather than reaching a
-# request the bracket cannot answer.
+# an unconstrained `sd` gets `-Inf` from `valid_moments` rather than reaching
+# a request the bracket cannot answer.
 #
 # LOWER: a CV below the value attained at `shape_max` has no root inside
 # the bracket. `pi / (sqrt(6) * shape_max)` is the large-shape asymptote
@@ -309,16 +377,22 @@ function _weibull_cv_max(::Type{T}) where {T}
     return exp(x / 2)
 end
 
-# The shape follows from the solved root; the scale then follows in closed
-# form, `b = mean / Γ(1 + 1/a) = mean * exp(-logΓ(1 + u))`. The CV window
-# is checked before the solve runs, so an out-of-window request is `nothing`
-# rather than reaching `_check_bracket`'s throw.
-function to_native(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
+# The moments' own validity, including the window the root-find can
+# actually solve: checked here, before `to_native` ever runs the solve, so
+# an out-of-window request is `-Inf` rather than reaching `_check_bracket`'s
+# throw.
+function valid_moments(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    (mean > 0 && sd > 0) || return nothing
+    (mean > 0 && sd > 0) || return false
     cv = sd / mean
     T = typeof(cv)
-    (_weibull_cv_min(T) < cv < _weibull_cv_max(T)) || return nothing
+    return _weibull_cv_min(T) < cv < _weibull_cv_max(T)
+end
+
+# The shape follows from the solved root; the scale then follows in closed
+# form, `b = mean / Γ(1 + 1/a) = mean * exp(-logΓ(1 + u))`.
+function to_native(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
+    mean, sd = vals
     s = solve_moment(Weibull, Val((:mean, :sd)), _weibull_residual,
         _weibull_deriv, _weibull_bracket, vals)
     u = exp(-s)
@@ -329,6 +403,11 @@ end
 # every other family above.
 function to_native(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    var > 0 || return nothing
     return to_native(Weibull, Val((:mean, :sd)), (mean, sqrt(var)))
+end
+
+function valid_moments(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
+    mean, var = vals
+    return var > 0 && valid_moments(Weibull, Val((:mean, :sd)),
+        (mean, sqrt(var)))
 end
