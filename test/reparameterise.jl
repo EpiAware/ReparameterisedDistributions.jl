@@ -138,6 +138,29 @@ end
     @test isfinite(logpdf(good, 7.5))
 end
 
+@testitem "reparameterise: an overflowing moment does not throw either" begin
+    using Distributions
+
+    # #88: `mean` and `sd` can both be genuinely positive — passing
+    # `valid_moments`'s own `mean > 0 && sd > 0` check — and still not
+    # describe a valid Gamma. The closed form squares `sd`
+    # (`scale = sd^2 / mean`), so a large enough `sd` overflows `Float64`
+    # to `Inf`, and `shape = mean / scale` then comes back exactly `0.0`.
+    # This is what a sampler's step-size search can hit before warmup has
+    # calibrated a sane step: an unconstrained probe maps to an
+    # astronomically large, but still positive, moment. With
+    # `check_args = true` (the default) that construction throws mid-
+    # gradient; `check_args = false` is what a model has to pass to avoid
+    # it, and the density it gets back is not `-Inf` here but `NaN` — the
+    # guarantee is only "does not throw", not "reports a clean zero
+    # density". Both matter for how `reparameterise` should be used inside
+    # a `@model`, so both are pinned.
+    overflowed = reparameterise(Gamma; mean = 1e150, sd = 1e200,
+        check_args = false)
+    @test isnan(logpdf(overflowed, 4.0))
+    @test isnan(pdf(overflowed, 4.0))
+end
+
 @testitem "valid_moments: false means no member of the family, checked first" begin
     using Distributions
 
@@ -218,8 +241,8 @@ end
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     # Pinned to the exact string, not just a substring, so a fallback to
-    # verbose default printing (or any other regression) is caught even if
-    # it still happens to contain "mean = 8.0" somewhere in the noise.
+    # verbose default printing is caught even if it still happens to
+    # contain "mean = 8.0" somewhere in the noise.
     @test sprint(show, d) == "reparameterise(LogNormal; mean = 8.0, sd = 2.0)"
 end
 
