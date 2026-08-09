@@ -229,6 +229,11 @@ end
     @test occursin("mean = 8.0", out)
     @test occursin("native:", out)
     @test occursin("LogNormal", out)
+
+    invalid = reparameterise(
+        LogNormal; mean = 8.0, sd = -1.0, check_args = false)
+    @test occursin("invalid parameters", sprint(show, MIME("text/plain"),
+        invalid))
 end
 
 @testitem "reparameterise: the rebuild hook promotes like the front door" begin

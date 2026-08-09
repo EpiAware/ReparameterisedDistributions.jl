@@ -60,7 +60,7 @@ end
 
 # --- A numeric family registers the same two hooks as an analytic one -----
 
-@testitem "A numeric family needs valid_moments and to_native (via solve_moment)" begin
+@testitem "A numeric family needs valid_moments and to_native" begin
     using Distributions
     import ReparameterisedDistributions: solve_moment
 

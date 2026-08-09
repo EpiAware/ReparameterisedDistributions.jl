@@ -217,13 +217,11 @@ broken_scenario_names() = String[]
 # found — see `_primal` in src/numeric.jl), but Enzyme and Mooncake trace
 # INTO Roots' own internals when building a reverse-mode rule for the
 # solve, and fail there: measured, `Enzyme.Compiler.IllegalTypeAnalysisException`
-# for Enzyme reverse, a rule-derivation error for Mooncake reverse.
-# Recorded here rather than left to crash `task test-ad`; a follow-up can
-# apply the same `_primal`-stripping / `EnzymeRules.inactive` /
-# `Mooncake.@zero_derivative` treatment `_solve_moment_equation` already
-# gets for ForwardDiff to the forward variants too, once actually run and
-# confirmed to need it (untested here, so conservatively marked broken
-# alongside their reverse-mode counterparts rather than assumed to pass).
+# for both Enzyme variants, an `ArgumentError` (bitcast to a differentiable
+# type) for both Mooncake variants. Recorded here rather than left to crash
+# `task test-ad`; a follow-up can apply the same `_primal`-stripping /
+# `EnzymeRules.inactive` / `Mooncake.@zero_derivative` treatment
+# `_solve_moment_equation` already gets for ForwardDiff to these four too.
 "Per-backend broken scenario names (`Dict{String, Set{String}}`)."
 function backend_broken_scenarios()
     weibull = "Weibull(mean, sd) loglik"
