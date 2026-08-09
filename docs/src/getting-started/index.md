@@ -102,6 +102,23 @@ Register both methods under the parameter names sorted alphabetically:
 a method registered under `Val((:sd, :mean))` is never found. The
 [Public API](@ref public-api) documents both hooks.
 
+### Migrating a family registered against v0.2.0
+
+`v0.2.0` folded the guard into `to_native` itself, which returned
+`Union{Nothing, D}` instead of a concrete `D` for an invalid point. That
+shape let a differentiated call site bind a `Union{Nothing, D}`-typed
+value, which produced a silently wrong reverse-mode gradient under Enzyme
+for some parameterisations.
+
+A family registered against `v0.2.0` has a `to_native` method that guards
+its own input and returns `nothing` for an invalid point. Move that guard
+into a `valid_moments` method instead, and let `to_native` run
+unconditionally on parameters already known valid. Left unmoved, the
+registration fails loudly rather than silently: the 3-arg `valid_moments`
+fallback reports the point valid, `to_native` returns `nothing`, and the
+density raises a `MethodError` on `nothing` at exactly the point that used
+to give `-Inf`.
+
 ## Rescaling a moment
 
 `rescale(d, factor)` scales one of `d`'s registered moments by `factor`,
