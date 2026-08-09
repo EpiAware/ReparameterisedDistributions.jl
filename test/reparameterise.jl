@@ -128,9 +128,9 @@ end
     # deviation converts to a native distribution that is not just valid but
     # IDENTICAL to the one a positive standard deviation gives — so without the
     # guard the density would be finite, equal to the density at +sd, and the
-    # sign would be unidentifiable. `to_native` guards before doing that
-    # algebra, so `native` never reaches the aliased distribution and throws
-    # instead; the wrapper refuses the invalid point either way.
+    # sign would be unidentifiable. `valid_moments` guards before `native`
+    # reaches that algebra, so it throws instead of returning the aliased
+    # distribution; the wrapper refuses the invalid point either way.
     bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
     good = reparameterise(LogNormal; mean = 8.0, sd = 1.0, check_args = false)
     @test_throws DomainError native(bad)
@@ -138,23 +138,26 @@ end
     @test isfinite(logpdf(good, 7.5))
 end
 
-@testitem "to_native: nothing means no member of the family, checked first" begin
+@testitem "valid_moments: false means no member of the family, checked first" begin
     using Distributions
 
-    # The guard runs before any algebra: a negative `sd` never reaches the
-    # `sqrt`/squaring that would otherwise alias it onto a valid distribution.
-    @test to_native(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) === nothing
+    # `valid_moments` is checked before `to_native` ever runs, so `to_native`
+    # itself never needs to guard: it is called only on parameters already
+    # known valid, and always returns a concrete distribution, never
+    # `nothing`.
+    @test valid_moments(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) == false
+    @test valid_moments(LogNormal, Val((:mean, :sd)), (8.0, 1.0)) == true
     @test to_native(LogNormal, Val((:mean, :sd)), (8.0, 1.0)) isa LogNormal
 
     # The delegating `(mean, var)` methods must guard `var > 0` themselves,
-    # before the `sqrt` — a negative variance must come back `nothing`, not
-    # throw from inside `sqrt`.
-    @test to_native(LogNormal, Val((:mean, :var)), (8.0, -4.0)) === nothing
-    @test to_native(Gamma, Val((:mean, :var)), (8.0, -4.0)) === nothing
-    @test to_native(Beta, Val((:mean, :var)), (0.3, -0.01)) === nothing
-    @test to_native(InverseGaussian, Val((:mean, :var)), (3.0, -4.0)) ===
-          nothing
-    @test to_native(Weibull, Val((:mean, :var)), (8.0, -9.0)) === nothing
+    # before the `sqrt` inside the delegated `(mean, sd)` check — a negative
+    # variance must come back `false`, not throw from inside `sqrt`.
+    @test valid_moments(LogNormal, Val((:mean, :var)), (8.0, -4.0)) == false
+    @test valid_moments(Gamma, Val((:mean, :var)), (8.0, -4.0)) == false
+    @test valid_moments(Beta, Val((:mean, :var)), (0.3, -0.01)) == false
+    @test valid_moments(InverseGaussian, Val((:mean, :var)), (3.0, -4.0)) ==
+          false
+    @test valid_moments(Weibull, Val((:mean, :var)), (8.0, -9.0)) == false
 end
 
 @testitem "loglikelihood: an invalid wrapper is guarded, not silently wrong" begin
@@ -163,8 +166,8 @@ end
     # #80: the batched `loglikelihood` used to call `loglikelihood(native(d),
     # x)` with no guard at all, so an invalid `check_args = false` wrapper
     # gave `-Inf` from scalar `logpdf` but a finite, wrong answer from the
-    # batched path. The single hook forces the guard to be written, because
-    # `nothing` cannot be passed to `Distributions.loglikelihood`.
+    # batched path. `loglikelihood` now checks `valid_moments` itself, the
+    # same way `logpdf` and `pdf` do, rather than delegating to `native`.
     bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
     obs = [7.5, 8.0, 9.0]
 

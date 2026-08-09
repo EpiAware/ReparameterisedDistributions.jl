@@ -423,3 +423,57 @@ end
     @inferred logpdf(dig, 2.0)
     @inferred mean(dig)
 end
+
+@testitem "every registered to_native is concrete, never a Nothing union" begin
+    using Distributions, Test
+    import ReparameterisedDistributions as RD
+
+    # #86: a `to_native` returning `Union{Nothing, D}` made Enzyme reverse
+    # mode compute a silently wrong gradient on x86_64 — no error, no
+    # warning — for the two NegativeBinomial parameterisations. The invariant
+    # the fix rests on is that no registered `to_native` may ever return
+    # `nothing`, so the differentiated call sites in `logpdf`, `pdf` and
+    # `loglikelihood` never bind a union-typed value.
+    #
+    # `@inferred` provably does NOT catch this: Julia's union-splitting
+    # narrows the OUTER return type back to a concrete `Float64` on every
+    # branch, so `@inferred logpdf(d, x)` passed before, during and after the
+    # bug. The instability is only visible one level in, on `to_native`'s own
+    # return type — which is what this checks, for every registered pair at
+    # once, so a family added later cannot reintroduce the shape unnoticed.
+    #
+    # This is a type-level check, so it holds on every platform; the bug
+    # itself only manifests on x86_64, where the AD suite is the only thing
+    # that would otherwise catch it.
+    registered = Tuple{Any, Any}[]
+    for m in methods(RD.to_native)
+        # Skip any test-only registration made from another test item.
+        m.module === RD || continue
+        # The 3-arg fallback's signature is a `UnionAll` over its `D` and
+        # `names`; unwrap before indexing, then drop it below because those
+        # two come out as `TypeVar`s rather than a type and a name tuple.
+        sig = Base.unwrap_unionall(m.sig)
+        fam = sig.parameters[2]
+        val = sig.parameters[3]
+        fam isa DataType && fam <: Type || continue
+        val isa DataType && val <: Val || continue
+        D = fam.parameters[1]
+        names = val.parameters[1]
+        D isa Type && names isa Tuple{Vararg{Symbol}} || continue
+        push!(registered, (D, names))
+    end
+
+    # Guard the guard: if the extraction above silently matched nothing, the
+    # loop below would pass vacuously.
+    @test length(registered) == 16
+
+    for (D, names) in registered
+        args = (Type{D}, Val{names}, NTuple{length(names), Float64})
+        rts = Base.return_types(RD.to_native, args)
+        @test length(rts) == 1
+        rt = only(rts)
+        @test !(Nothing <: rt)
+        @test rt <: D
+        @test isconcretetype(rt)
+    end
+end
