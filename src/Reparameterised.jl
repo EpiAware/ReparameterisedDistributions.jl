@@ -234,8 +234,8 @@ guarding, so it always returns a concrete distribution rather than a
 cosmetic: an AD-hot call site that instead bound a
 `Union{Nothing, <native type>}`-typed conversion result has produced a
 silently wrong reverse-mode gradient in this package before, with no error
-and no warning (see `NEWS.md`); a family's own math never has to defend
-against that on its own so long as it registers a truthful predicate here.
+and no warning; a family's own math never has to defend against that on
+its own so long as it registers a truthful predicate here.
 
 `nothing` cannot be recovered from the native distribution's own type: some
 conversions are even in the invalid direction (the LogNormal and Gamma
@@ -247,14 +247,21 @@ in a method registered here, before [`to_native`](@ref) runs.
 Each supported (family, parameter-name) pair adds a method alongside its
 [`to_native`](@ref) registration. The 3-arg fallback accepts anything, so a
 family that registers `to_native` without a matching `valid_moments` method
-is treated as always valid — the failure then surfaces from `to_native`
-itself, or from the native family's own argument check at construction.
+is silently treated as always valid: on the `check_args = false` hot path
+nothing surfaces the omission, and `logpdf`/`pdf`/`loglikelihood` return a
+finite, wrong density instead of `-Inf` at an invalid point. Register both
+methods together.
 
 # Arguments
 - the native family being checked for.
 - `Val(names)`: the alternative parameter names, as a value type so the
   check is resolved at compile time.
 - `vals`: the alternative parameter values, in `names` order.
+
+# Returns
+`Bool`. Must not throw, and must also exclude points [`to_native`](@ref)
+cannot represent even though the moment itself looks fine, such as a
+numeric family's solvable window.
 
 # Examples
 ```@example
@@ -307,7 +314,7 @@ native(d), params(native(d))
 - [`valid_moments`](@ref): the per-family guard checked first.
 "
 function native(d::Reparameterised{D, names}) where {D, names}
-    valid_moments(D, Val(names), d.vals) || throw(DomainError(d.vals,
+    valid_moments(D, Val(names), d.vals)::Bool || throw(DomainError(d.vals,
         "invalid $(collect(names)) for $(D)"))
     return to_native(D, Val(names), d.vals)
 end
@@ -337,9 +344,12 @@ known valid and always returns a concrete `D`, never a `Union` of one and
 That split, not a stylistic preference, is why this stays two methods
 rather than one: an AD-hot call site that bound a `Union{Nothing, D}`-typed
 conversion result has produced a silently wrong reverse-mode gradient in
-this package before (see `NEWS.md`), and a call site here can only avoid
-that failure mode if every registered `to_native` method is unconditionally
-concrete.
+this package before, and a call site here can only avoid that failure mode
+if every registered `to_native` method is unconditionally concrete.
+
+Calling this directly, rather than through [`native`](@ref) or a wrapper's
+own methods, without first checking [`valid_moments`](@ref) is undefined:
+it may return a meaningless distribution or throw, never `nothing`.
 
 # Arguments
 - the native family being converted to.
@@ -402,14 +412,14 @@ end
 # `Union{Nothing, D}`. Do not collapse this back into a single call that
 # branches on `to_native`'s result — see `to_native`'s own docstring for why.
 function logpdf(d::Reparameterised{D, names}, x::Real) where {D, names}
-    valid_moments(D, Val(names), d.vals) ||
+    valid_moments(D, Val(names), d.vals)::Bool ||
         return convert(_restype(d, x), -Inf)
     nd = to_native(D, Val(names), d.vals)
     return logpdf(nd, x)
 end
 
 function pdf(d::Reparameterised{D, names}, x::Real) where {D, names}
-    valid_moments(D, Val(names), d.vals) || return zero(_restype(d, x))
+    valid_moments(D, Val(names), d.vals)::Bool || return zero(_restype(d, x))
     nd = to_native(D, Val(names), d.vals)
     return pdf(nd, x)
 end
@@ -458,7 +468,7 @@ Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, native(d))
 function loglikelihood(
         d::Reparameterised{D, names, N1, T, Univariate},
         x::AbstractArray{<:Real, M}) where {D, names, N1, T, M}
-    valid_moments(D, Val(names), d.vals) ||
+    valid_moments(D, Val(names), d.vals)::Bool ||
         return convert(_restype(d, zero(eltype(x))), -Inf)
     nd = to_native(D, Val(names), d.vals)
     return loglikelihood(nd, x)
@@ -478,7 +488,7 @@ function Base.show(io::IO, ::MIME"text/plain",
         d::Reparameterised{D, names}) where {D, names}
     show(io, d)
     print(io, "\n  native: ")
-    if valid_moments(D, Val(names), d.vals)
+    if valid_moments(D, Val(names), d.vals)::Bool
         show(io, to_native(D, Val(names), d.vals))
     else
         print(io, "invalid parameters")
