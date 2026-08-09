@@ -217,8 +217,10 @@ end
     using Distributions
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
-    @test occursin("mean = 8.0", sprint(show, d))
-    @test occursin("sd = 2.0", sprint(show, d))
+    # Pinned to the exact string, not just a substring, so a fallback to
+    # verbose default printing (or any other regression) is caught even if
+    # it still happens to contain "mean = 8.0" somewhere in the noise.
+    @test sprint(show, d) == "reparameterise(LogNormal; mean = 8.0, sd = 2.0)"
 end
 
 @testitem "reparameterise: MIME text/plain show also reports the native distribution" begin
@@ -226,8 +228,9 @@ end
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     out = sprint(show, MIME("text/plain"), d)
-    @test occursin("mean = 8.0", out)
-    @test occursin("native:", out)
+    @test out ==
+          "reparameterise(LogNormal; mean = 8.0, sd = 2.0)\n" *
+          "  native: " * sprint(show, native(d))
     @test occursin("LogNormal", out)
 
     invalid = reparameterise(

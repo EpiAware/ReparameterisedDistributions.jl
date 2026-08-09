@@ -476,7 +476,14 @@ end
 
 function Base.show(io::IO, d::Reparameterised{D, names}) where {D, names}
     args = join(("$n = $v" for (n, v) in zip(names, d.vals)), ", ")
-    return print(io, "reparameterise(", D, "; ", args, ")")
+    # `nameof`, not `D` itself: printing the type directly qualifies it by
+    # module whenever the active module differs from the one `D` is defined
+    # in (a doctest sandbox, a TestItemRunner module, ...), so the same call
+    # would print as `Distributions.Gamma` in one context and `Gamma` in
+    # another. The short name is what a user actually typed and is always
+    # in scope wherever `reparameterise` itself is, so it stays both
+    # pasteable and stable across contexts.
+    return print(io, "reparameterise(", nameof(D), "; ", args, ")")
 end
 
 # The compact form above stays code-reconstructable, so error messages and

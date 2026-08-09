@@ -51,7 +51,7 @@ scale_prior = truncated(Normal(4.0, 2.0); lower = 0.0)
 
 n = 20_000
 native = [Gamma(rand(shape_prior), rand(scale_prior)) for _ in 1:n]
-implied_mean = mean.(native)
+implied_mean = mean.(native);
 
 # `reparameterise` builds the same family from a mean and a standard
 # deviation, so the prior can be put on the mean itself.
@@ -61,7 +61,7 @@ sd_prior = truncated(Normal(3.0, 1.0); lower = 0.0)
 
 moments = [reparameterise(Gamma; mean = rand(mean_prior), sd = rand(sd_prior))
            for _ in 1:n]
-direct_mean = mean.(moments)
+direct_mean = mean.(moments);
 
 # Both branches call `mean` on a `Gamma`; only the coordinates the prior was
 # written in differ.
@@ -105,10 +105,16 @@ y = rand(truth, 300)
     y .~ Gamma(shape, scale)
 end
 
+# `check_args = false` turns off the construction-time validity check.
+# A sampler proposes in unconstrained space, so a step can briefly land on
+# an invalid moment; without this, that proposal raises mid-gradient
+# instead of the sampler just seeing a `-Inf` density and rejecting it.
+
 @model function moment_model(y)
     delay_mean ~ mean_prior
     delay_sd ~ sd_prior
-    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd)
+    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd,
+        check_args = false)
 end
 
 native_chain = sample(native_model(y), NUTS(), 1000; progress = false)
@@ -123,7 +129,7 @@ summarystats(moment_chain)
 # The native fit reports a shape and a scale, so a posterior for the mean has
 # to be reconstructed from the draws.
 
-native_mean = vec(native_chain[:shape]) .* vec(native_chain[:scale])
+native_mean = vec(native_chain[:shape]) .* vec(native_chain[:scale]);
 
 # That transform is one line for a `Gamma` and a different line for every
 # other family, has to be redone for the standard deviation, and is applied
