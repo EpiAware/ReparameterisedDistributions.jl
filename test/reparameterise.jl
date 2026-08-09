@@ -143,18 +143,16 @@ end
 
     # #88: `mean` and `sd` can both be genuinely positive — passing
     # `valid_moments`'s own `mean > 0 && sd > 0` check — and still not
-    # describe a valid Gamma. The closed form squares `sd`
-    # (`scale = sd^2 / mean`), so a large enough `sd` overflows `Float64`
-    # to `Inf`, and `shape = mean / scale` then comes back exactly `0.0`.
-    # This is what a sampler's step-size search can hit before warmup has
-    # calibrated a sane step: an unconstrained probe maps to an
-    # astronomically large, but still positive, moment. With
-    # `check_args = true` (the default) that construction throws mid-
-    # gradient; `check_args = false` is what a model has to pass to avoid
-    # it, and the density it gets back is not `-Inf` here but `NaN` — the
-    # guarantee is only "does not throw", not "reports a clean zero
-    # density". Both matter for how `reparameterise` should be used inside
-    # a `@model`, so both are pinned.
+    # describe a valid Gamma. That check covers the moments, not the native
+    # parameters the closed form derives from them: `scale = sd^2 / mean`
+    # squares `sd`, so a large enough `sd` overflows `Float64` to `Inf`,
+    # and `shape = mean / scale` then comes back exactly `0.0`. A model's
+    # `check_args = true` default catches this at construction and throws;
+    # `check_args = false` avoids that throw, but does not fix the
+    # underlying guard-coverage gap — the density it currently gives back
+    # is `NaN`, not the `-Inf` the package's own docs promise for an
+    # invalid point. That is worth pinning as-is (it does not throw) rather
+    # than asserting it is the intended contract.
     overflowed = reparameterise(Gamma; mean = 1e150, sd = 1e200,
         check_args = false)
     @test isnan(logpdf(overflowed, 4.0))

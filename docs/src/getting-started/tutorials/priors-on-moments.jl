@@ -106,9 +106,13 @@ y = rand(truth, 300)
 end
 
 # `check_args = false` turns off the construction-time validity check.
-# A sampler proposes in unconstrained space, so a step can briefly land on
-# an invalid moment; without this, that proposal raises mid-gradient
-# instead of the sampler just seeing a `-Inf` density and rejecting it.
+# `reparameterise`'s own docs recommend this whenever the call sits on
+# the right of a `~`: a step-size search can probe values far from the
+# posterior before warmup has calibrated a sane step, and the closed-form
+# conversion is not guaranteed to stay well-behaved that far out. Leaving
+# the check on risks a construction-time exception raised mid-gradient,
+# which crashes the sampler outright rather than reporting a poor density
+# for that point.
 
 @model function moment_model(y)
     delay_mean ~ mean_prior
