@@ -62,7 +62,7 @@ end
 
 @testitem "A numeric family needs valid_moments and to_native" begin
     using Distributions
-    import ReparameterisedDistributions: solve_moment
+    import ReparameterisedDistributions: solve_moment, to_native
 
     # A test-only registration on `Gamma(mean, sdnumeric)`, a pair with no
     # existing method, using the two-hook contract every family uses —

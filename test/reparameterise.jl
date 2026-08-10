@@ -181,6 +181,7 @@ end
 
 @testitem "valid_moments: false means no member of the family, checked first" begin
     using Distributions
+    using ReparameterisedDistributions: to_native, valid_moments
 
     # `valid_moments` is checked before `to_native` ever runs, so `to_native`
     # itself never needs to guard: it is called only on parameters already
