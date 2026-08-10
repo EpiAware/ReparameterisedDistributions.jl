@@ -27,6 +27,19 @@
 # EpiAwareADTools.jl. `args...` (rather than typing `f`/`lo`/`hi`) matches
 # any closure `f` a family's `to_native` builds, since the closure's own
 # type differs per registered family.
+#
+# KNOWN LIMITATION — Hessians are NOT supported through this rule. A
+# `DifferentiationInterface.hessian` call over the Weibull numeric path
+# under either `AutoEnzyme` mode throws an internal Enzyme codegen
+# `AssertionError` (`codegen_i=2 > length(codegen_types)=1 ...  GHOST`);
+# the identical call against a closed-form family (e.g. `LogNormal`)
+# succeeds, so this is specific to differentiating THROUGH this
+# `inactive` rule at second order, not a general Enzyme limitation. Use
+# `AutoForwardDiff` (or `SecondOrder(AutoForwardDiff(), AutoForwardDiff())`)
+# for a Hessian that touches a numeric (Weibull) conversion; see
+# `test/ad/scenarios.jl` for the regression test covering this and
+# `ReparameterisedDistributionsMooncakeExt` for Mooncake's (worse)
+# failure mode on the same call.
 module ReparameterisedDistributionsEnzymeExt
 
 using ReparameterisedDistributions: _solve_moment_equation

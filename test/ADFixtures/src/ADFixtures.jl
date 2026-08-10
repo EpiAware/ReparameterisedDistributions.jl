@@ -171,7 +171,20 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         ("InverseGaussian(mean, sd) loglik", _invgauss_meansd_loglik,
             [3.0, 2.0], reals),
         ("Weibull(mean, sd) loglik", _weibull_meansd_loglik, [8.0, 3.0],
-            reals))
+            reals),
+        # Near the fragile edge of the numerically solvable CV window
+        # (`_weibull_shape_max` in src/families.jl): `mean = 74.916, sd =
+        # 1.079` is the point `solve_moment`'s own comments in
+        # src/numeric.jl single out as one where a bracketed solve in
+        # `Dual` arithmetic is unreliable even though the corrected
+        # derivative is exact. It sits inside the solvable window, not on
+        # its boundary — AT `cv_min` itself every backend (including
+        # ForwardDiff) degrades to NaN/Inf, a separate, pre-existing shared
+        # numerical edge unrelated to this scenario. Registered so a
+        # regression at this edge is caught by the AD suite automatically,
+        # rather than relying on a one-off manual check.
+        ("Weibull(mean, sd) loglik (near CV window edge)",
+            _weibull_meansd_loglik, [74.916, 1.079], reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,

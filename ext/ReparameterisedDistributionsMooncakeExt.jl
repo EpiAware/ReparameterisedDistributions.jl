@@ -18,6 +18,20 @@
 # `f` closure, since each registered family builds a differently-typed one;
 # mirrors the `Any` ctor position in CensoredDistributions'
 # `_ctor_has_check_args` Mooncake rule for the same reason.
+#
+# KNOWN LIMITATION — Hessians are NOT supported through this rule, and this
+# one is worse than Enzyme's: `DifferentiationInterface.hessian` over the
+# Weibull numeric path with `SecondOrder(AutoForwardDiff(), AutoMooncake())`
+# (ForwardDiff outer, Mooncake inner — differentiating a `ForwardDiff.Dual`
+# through this `@zero_derivative` rule) does not raise a catchable Julia
+# exception at all; it hits an LLVM assertion in Enzyme's
+# `AdjointGenerator.h` (Mooncake's Enzyme-derived rule compiler) and
+# **aborts the whole process** (`Abort trap: 6`). Deliberately not covered
+# by an automated test anywhere in this package for exactly that reason — a
+# process abort cannot be caught by `@test`/`@test_broken` and would take
+# down whichever CI job ran it with no diagnostic. Use `AutoForwardDiff`
+# (or `SecondOrder(AutoForwardDiff(), AutoForwardDiff())`) for a Hessian
+# that touches a numeric (Weibull) conversion.
 module ReparameterisedDistributionsMooncakeExt
 
 using ReparameterisedDistributions: _solve_moment_equation
