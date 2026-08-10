@@ -10,17 +10,23 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [weakdeps]
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 Roots = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
 
 [extensions]
+ReparameterisedDistributionsEnzymeExt = "Enzyme"
 ReparameterisedDistributionsForwardDiffExt = "ForwardDiff"
+ReparameterisedDistributionsMooncakeExt = "Mooncake"
 ReparameterisedDistributionsRootsExt = "Roots"
 
 [compat]
 Distributions = "0.25"
 DocStringExtensions = "0.9"
+Enzyme = "0.13"
 ForwardDiff = "0.10, 1"
+Mooncake = "0.5"
 Random = "1"
 Roots = "2.2, 3"
 SpecialFunctions = "2"
