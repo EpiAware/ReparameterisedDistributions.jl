@@ -49,5 +49,8 @@ const QA_CONFIG = (
             prefixes = ("ReparameterisedDistributions", "Roots")),
         (; name = :ReparameterisedDistributionsForwardDiffExt,
             triggers = ("ForwardDiff",),
-            prefixes = ("ReparameterisedDistributions", "ForwardDiff")))
+            prefixes = ("ReparameterisedDistributions", "ForwardDiff")),
+        (; name = :ReparameterisedDistributionsTestExt,
+            triggers = ("Test",),
+            prefixes = ("ReparameterisedDistributions", "Test")))
 )

@@ -67,6 +67,9 @@ include("interface.jl")
 include("Reparameterised.jl")
 include("numeric.jl")
 include("families.jl")
+# The interface test suite's stub; its implementation is a package extension
+# on Test, so a test suite reaches it with `using Test`.
+include("testing.jl")
 
 @static if VERSION >= v"1.11"
     include("public.jl")
