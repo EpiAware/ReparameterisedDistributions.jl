@@ -4,7 +4,7 @@ CurrentModule = ReparameterisedDistributions
 
 # [Adding a reparameterisation](@id adding-a-reparameterisation)
 
-A parameterisation is registered by two methods, and nothing else.
+A parameterisation is registered by two methods.
 There is no registry to append to, no trait to opt into and no macro to call.
 Adding the two methods is the whole of it, whether they live in this package or in yours.
 
