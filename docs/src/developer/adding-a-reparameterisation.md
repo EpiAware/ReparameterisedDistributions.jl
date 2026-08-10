@@ -6,9 +6,6 @@ CurrentModule = ReparameterisedDistributions
 
 A parameterisation is registered by two methods.
 There is no registry to append to, no trait to opt into and no macro to call.
-Adding the two methods is the whole of it, whether they live in this package or in yours.
-
-This page is the contract those two methods have to keep, a worked example that keeps it, and the test suite that checks a registration against it.
 
 ```@example adding
 using ReparameterisedDistributions, Distributions
@@ -21,17 +18,16 @@ using ReparameterisedDistributions, Distributions
 | [`valid_moments`](@ref) | `(::Type{D}, ::Val{names}, vals)` | `Bool` | first, at every call site |
 | [`to_native`](@ref) | `(::Type{D}, ::Val{names}, vals)` | a concrete `D` | only once the predicate has passed |
 
-Both are exported, and both take the same three arguments.
+Both are public, not exported, and both take the same three arguments.
 
-`D` is the native Distributions.jl family being converted to.
+`D` is the distribution type being converted to, any subtype of `Distributions.Distribution` defined in this package, in Distributions.jl, or in your own.
 `names` is the tuple of alternative parameter names, carried as a `Val` so the pair is resolved at compile time rather than by comparing symbols at run time.
 `vals` is the alternative parameter values, in `names` order, already promoted to a common floating-point type.
 
-Every call site in the package — `reparameterise`, `native`, `logpdf`, `pdf`, `loglikelihood` and the REPL `show` method — checks the predicate and then, separately, calls the conversion.
+Every call site in the package (`reparameterise`, `native`, `logpdf`, `pdf`, `loglikelihood` and the REPL `show` method) checks the predicate and then, separately, calls the conversion.
 Nothing calls the conversion without checking first.
 
-Both are exported rather than merely public, because a registration has to add methods to them.
-Adding a method to a name brought into scope by `using` is an error in Julia, so import them explicitly or qualify the definitions:
+Add methods through `import`, or by qualifying them:
 
 ```julia
 import ReparameterisedDistributions: to_native, valid_moments
@@ -41,47 +37,19 @@ import ReparameterisedDistributions: to_native, valid_moments
 ## What `valid_moments` must guarantee
 
 It answers whether the given values describe a member of the family, without converting and without throwing.
-
-It has to decide this **in the alternative parameters' own coordinates**, because the native distribution's type cannot always recover the answer.
-The `LogNormal` and `Gamma` conversions square the standard deviation, so a negative standard deviation builds exactly the same, perfectly valid native distribution as its positive counterpart.
-By the time the conversion has run, the invalidity is gone.
-
-It also has to cover combinations that are individually fine but jointly unattainable.
-A `Beta`'s variance cannot exceed `mean * (1 - mean)`, so a positive mean in `(0, 1)` and a positive standard deviation can still describe no `Beta` at all.
-For a numerically converted family it also has to state the window the root-find can actually solve, so an out-of-window request is a zero density rather than a throw from inside the solver.
-
-Return `Bool`, not a number and not `nothing`: every differentiated call site branches on this value.
-
-The three-argument fallback returns `true`, so a family that registers only a conversion is silently treated as always valid.
-That is rarely what you want, and it is rarely loud: `check_args = true` construction still raises for many invalid points, but on the `check_args = false` hot path nothing surfaces the omission, and `logpdf`/`pdf`/`loglikelihood` return a finite, wrong density instead of `-Inf`.
-Register both methods together.
+It decides this in the alternative parameters' own coordinates: a negative `sd` in the `LogNormal`/`Gamma` conversions builds the same, valid native distribution as a positive one, so the conversion cannot recover the answer from the native type.
+It must cover jointly unattainable combinations: a `Beta`'s variance cannot exceed `mean * (1 - mean)`, so a positive mean and a positive standard deviation can still describe no `Beta` at all.
+For a numerically converted family, it must state the window the root-find can actually solve.
+Return `Bool`.
+The three-argument fallback returns `true`, so register both methods together.
 
 ## What `to_native` must guarantee
 
 It performs the conversion, unconditionally, and returns a concretely-typed distribution of the family.
-
-It must not guard its own input.
-The predicate has already run at every call site, so the conversion may assume its input is valid and build whatever it builds.
-
+It must not guard its own input: the predicate has already run at every call site.
 It must not return `nothing`, and must not contain a branch whose two arms return different types.
-
 Build the native distribution with `check_args = false`.
-The conversion sits on the sampler's hot path and runs inside a gradient; the checks have already happened in moment coordinates, and re-running the family's own checks here would raise mid-gradient at exactly the invalid points that are meant to give `-Inf`.
-Construction still forces one pass through the native family's own checks, once, so a moment that is individually valid but not representable (`mean = Inf`, say) is still caught up front.
-
-### Why the concrete return type is a hard requirement
-
-This is the one part of the contract that is not merely tidiness.
-
-An earlier release folded the guard into the conversion and returned `Union{Nothing, D}`, with each call site branching on the result.
-On x86_64, Enzyme reverse mode then computed a **silently wrong gradient** for the two `NegativeBinomial` parameterisations: no error, no warning, just wrong numbers.
-Binding a union-typed value on the differentiated path was enough to trigger it.
-
-Julia's own inference hides this from the obvious test.
-Union-splitting narrows the *outer* return type of `logpdf` back to a concrete `Float64` on every branch, so `@inferred logpdf(d, x)` passed throughout the bug.
-The instability is only visible one level in, on the conversion's own return type — which is what [`test_reparameterisation`](@ref) and the package's own regression guard check.
-
-So: check validity first, convert second, and keep the conversion's return type concrete.
+Construction still runs the native family's own checks once, so a moment that is individually valid but not representable (`mean = Inf`, say) is still caught.
 
 ## Parameter names are sorted before dispatch
 
@@ -119,9 +87,7 @@ function to_native(::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
 end
 ```
 
-`oftype(sd, 2)` rather than a bare `2` keeps a `Float32` — or a dual number under automatic differentiation — from being widened by the division.
-
-That is the whole registration.
+`oftype(sd, 2)` rather than a bare `2` keeps a `Float32`, or a dual number under automatic differentiation, from being widened by the division.
 
 ```@example adding
 d = reparameterise(Laplace; mean = 3.0, sd = 2.0)
@@ -174,7 +140,7 @@ It checks that:
 
 - the pair is registered at all, rather than falling through to the error-raising fallback, and is registered under the canonical sorted names;
 - `valid_moments` returns a `Bool`, and returns `true` at the point given;
-- `to_native` is inferred to a single, concrete distribution type of the family, and never admits `nothing`, which is the invariant the section above exists for;
+- `to_native` is inferred to a single, concrete distribution type of the family, and never admits `nothing`;
 - the wrapper builds, reports the given values as its `params`, and keeps the family's variate form and value support, so a discrete family stays discrete;
 - `native`, `logpdf` and `pdf` are type-inferred, and the densities and draws agree with the native distribution;
 - any parameter named `mean`, `sd` or `var` comes back out of the built distribution, which is what checks the conversion's algebra rather than only its types;

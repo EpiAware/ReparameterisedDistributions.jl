@@ -10,12 +10,15 @@ public AbstractReparameterisedDistribution, Reparameterised
 # within its own `to_native` method, and `test_reparameterisation` is the
 # interface test suite a registration — this package's own or another
 # package's — is checked against. Both are called rather than extended, so
-# both are public rather than exported, unlike the two registration hooks.
+# both are public rather than exported, like the two registration hooks.
 public solve_moment, test_reparameterisation
 
-# `to_native` and `valid_moments` (the two per-family extension points — see
-# families.jl for the pattern a new registration follows) and `native` (the
-# wrapper-level accessor) are exported instead of merely public — see the
-# main module file — because, unlike this package's other internals, a
-# caller is expected to type these names directly rather than dispatch on a
-# type.
+# `to_native` and `valid_moments` are the two per-family extension points a
+# registration implements (see families.jl for the pattern a new
+# registration follows). A registration author extends them by name, so
+# `using ReparameterisedDistributions` alone is not enough to reach them —
+# they must be named explicitly, either through `import` or a qualified
+# method definition (see the developer guide). That makes them public
+# rather than exported: unlike `reparameterise`, `rescale` and `native`,
+# these are not names an ordinary caller types directly.
+public to_native, valid_moments

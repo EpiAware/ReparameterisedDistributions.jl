@@ -1,9 +1,6 @@
 # [Getting started](@id getting-started)
 
-`reparameterise` wraps a Distributions.jl family so that its moments are its
-parameters.
-This page covers what the wrapper does, which parameterisations are
-registered, and how to rescale one.
+`reparameterise` wraps a distribution family so that its moments are its parameters, whichever package the family is defined in.
 
 ```@example getting-started
 using ReparameterisedDistributions, Distributions
@@ -76,51 +73,9 @@ Asking for one raises.
 | `Weibull` | `mean`, `var` | as above, given the variance |
 
 `Weibull(mean, sd)` has no exact closed form.
-The coefficient of variation depends on the shape alone, through a strictly
-monotone one-dimensional equation that a bracketing root-find solves, with
-the scale then following in closed form.
-The gradient is still exact: the root's derivative is recovered afterwards by
-an implicit-function-theorem correction rather than by differentiating through
-the solver.
+Its gradient stays exact under automatic differentiation.
 
-Registering a family, analytic or numeric, needs two methods: a
-`valid_moments` predicate stating which parameter values describe a member
-of the family, and a `to_native` method that assumes that predicate has
-already passed and performs the conversion unconditionally. A family with
-no exact closed form calls `solve_moment` from inside its own `to_native`,
-passing its moment equation, its derivative and a bracket as ordinary
-functions; `valid_moments` still states the window the root-find can
-actually solve, checked before the solve runs.
-
-Keeping the two separate, rather than folding the guard into `to_native`
-and returning `nothing` for an invalid point, keeps `to_native` returning a
-concretely-typed distribution rather than a `Union` of one and `nothing` —
-which matters on the hot path a gradient runs through, not only for style.
-
-Register both methods under the parameter names sorted alphabetically:
-`reparameterise` canonicalises its keywords that way before dispatching, so
-a method registered under `Val((:sd, :mean))` is never found. The
-[Public API](@ref public-api) documents both hooks, and
-[Adding a reparameterisation](@ref adding-a-reparameterisation) is the full
-contract, with a worked example and the test suite a registration is
-checked against.
-
-### Migrating a family registered against v0.2.0
-
-`v0.2.0` folded the guard into `to_native` itself, which returned
-`Union{Nothing, D}` instead of a concrete `D` for an invalid point. That
-shape let a differentiated call site bind a `Union{Nothing, D}`-typed
-value, which produced a silently wrong reverse-mode gradient under Enzyme
-for some parameterisations.
-
-A family registered against `v0.2.0` has a `to_native` method that guards
-its own input and returns `nothing` for an invalid point. Move that guard
-into a `valid_moments` method instead, and let `to_native` run
-unconditionally on parameters already known valid. Left unmoved, the
-registration fails loudly rather than silently: the 3-arg `valid_moments`
-fallback reports the point valid, `to_native` returns `nothing`, and the
-density raises a `MethodError` on `nothing` at exactly the point that used
-to give `-Inf`.
+A family is registered with two methods, documented in [Adding a reparameterisation](@ref adding-a-reparameterisation), with the reference in [Public API](@ref public-api).
 
 ## Rescaling a moment
 

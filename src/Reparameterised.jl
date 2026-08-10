@@ -1,6 +1,6 @@
 @doc raw"
 
-A native Distributions.jl family stood up under an alternative parameterisation.
+A native distribution family stood up under an alternative parameterisation.
 
 Stores the alternative parameter values in the order of the registered `names`,
 and converts to the native family through [`to_native`](@ref) whenever a
