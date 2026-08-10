@@ -1,7 +1,7 @@
 # PACKAGE-OWNED — scaffold writes this once and never overwrites it.
 # The test environment. Seeded with the deps the shared QA helpers and AD
 # harness need; add the package's own test-only deps here. EpiAwarePackageTools
-# supplies the helpers; until it is registered, pin it via `[sources]` below.
+# supplies the helpers and is a normal registered dependency below.
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
@@ -26,8 +26,8 @@ TestItems = "1c621080-faea-4a02-84b6-bbd5e436b8fe"
 ReparameterisedDistributions = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
 
 # Bounded compat for the seeded QA + AD deps (mirrors CensoredDistributions.jl).
-# The package under test and EpiAwarePackageTools are pinned by `[sources]`, so
-# they carry no compat entry. Add a bound for each test-only dep you add.
+# The package under test is pinned by `[sources]`, so it carries no compat
+# entry. Add a bound for each test-only dep you add.
 [compat]
 ADTypes = "1"
 Aqua = "0.8"
@@ -36,6 +36,7 @@ DifferentiationInterface = "0.6, 0.7"
 DifferentiationInterfaceTest = "0.9, 0.10, 0.11"
 Distributions = "0.25"
 Documenter = "1"
+EpiAwarePackageTools = "0.3"
 ExplicitImports = "1"
 ForwardDiff = "0.10, 1"
 JET = "0.9, 0.10, 0.11, 0.12"
@@ -51,7 +52,3 @@ Turing = "0.44, 0.46"
 
 [sources]
 ReparameterisedDistributions = {path = ".."}
-# Until EpiAwarePackageTools is registered, it is pinned by git so
-# the env resolves out of the box. Switch to a local path to
-# develop the kit alongside this package.
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}

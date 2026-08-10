@@ -3,9 +3,8 @@
 # standard). Add doc-only deps (e.g. plotting, DocumenterCitations) here as the
 # docs grow. The package itself is pinned by path via `[sources]`.
 # The managed `docs/make.jl` calls `using EpiAwarePackageTools` (the shared docs
-# build machinery), so the kit is a docs dep too; until it is registered it is
-# pinned by git via `[sources]` (empty for the kit itself, which is the
-# package).
+# build machinery), so the kit is a docs dep too; it is a normal registered
+# dependency below.
 # With `ad = true` the env also carries what the kit-managed AD-backends
 # tutorial page executes against: the package's `ADFixtures` registry (pinned
 # by path, same UUID as the AD test env) plus the benchmark and plotting stack.
@@ -35,10 +34,6 @@ ReparameterisedDistributions = "7cd6e41d-e337-45a7-b8fc-acb99a44bf42"
 [sources]
 ReparameterisedDistributions = {path = ".."}
 ADFixtures = {path = "../test/ADFixtures"}
-# Until EpiAwarePackageTools is registered, it is pinned by git so
-# the env resolves out of the box. Switch to a local path to
-# develop the kit alongside this package.
-EpiAwarePackageTools = {url = "https://github.com/EpiAware/EpiAwarePackageTools.jl", rev = "main"}
 
 [compat]
 AlgebraOfGraphics = "0.13"
@@ -55,4 +50,5 @@ Plots = "1"
 Documenter = "1"
 DocumenterCitations = "1"
 DocumenterVitepress = "0.3"
+EpiAwarePackageTools = "0.3"
 Literate = "2"
