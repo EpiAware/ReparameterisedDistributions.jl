@@ -54,10 +54,13 @@ using Distributions: Distributions, Distribution, Beta, Exponential, Gamma,
 # are defined (see src/docstrings.jl).
 include("docstrings.jl")
 
-# The verbs, and the two conversion functions, are exported; the wrapper type
-# and its supertype are public but not exported (see public.jl), following
-# the ecosystem convention.
-export reparameterise, rescale, to_native, native
+# The verbs a caller types directly — `reparameterise`, `rescale` and the
+# `native` accessor — are exported. The family-registration hooks
+# (`to_native` and its guard `valid_moments`), the wrapper type and its
+# supertype, are public but not exported (see public.jl), following the
+# ecosystem convention that verbs are exported and everything else is
+# public.
+export reparameterise, rescale, native
 
 # The abstract supertype, then the concrete wrapper and its front door, then
 # the numeric fallback the front door dispatches to when no closed form is
@@ -67,6 +70,9 @@ include("interface.jl")
 include("Reparameterised.jl")
 include("numeric.jl")
 include("families.jl")
+# The interface test suite's stub; its implementation is a package extension
+# on Test, so a test suite reaches it with `using Test`.
+include("testing.jl")
 
 @static if VERSION >= v"1.11"
     include("public.jl")

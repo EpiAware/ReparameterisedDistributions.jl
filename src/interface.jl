@@ -1,7 +1,7 @@
 @doc raw"
 
-Supertype for a distribution that stands in for a native Distributions.jl
-family under a different parameterisation.
+Supertype for a distribution that stands in for a native family under a
+different parameterisation.
 
 A subtype stores the alternative parameters and converts to the native family
 on demand, so it evaluates exactly as the native distribution does while

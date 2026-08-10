@@ -1,9 +1,6 @@
 # [Getting started](@id getting-started)
 
-`reparameterise` wraps a Distributions.jl family so that its moments are its
-parameters.
-This page covers what the wrapper does, which parameterisations are
-registered, and how to rescale one.
+`reparameterise` wraps a distribution family so that its moments are its parameters, whichever package the family is defined in.
 
 ```@example getting-started
 using ReparameterisedDistributions, Distributions
@@ -76,24 +73,9 @@ Asking for one raises.
 | `Weibull` | `mean`, `var` | as above, given the variance |
 
 `Weibull(mean, sd)` has no exact closed form.
-The coefficient of variation depends on the shape alone, through a strictly
-monotone one-dimensional equation that a bracketing root-find solves, with
-the scale then following in closed form.
-The gradient is still exact: the root's derivative is recovered afterwards by
-an implicit-function-theorem correction rather than by differentiating through
-the solver.
+Its gradient stays exact under automatic differentiation.
 
-Registering a family, analytic or numeric, needs exactly one `to_native`
-method: the conversion, guarding its own validity first and returning
-`nothing` for a value its parameters cannot describe. A family with no exact
-closed form calls `solve_moment` from inside its own `to_native`, passing
-its moment equation, its derivative and a bracket as ordinary functions,
-after the same guard.
-
-Register the method under the parameter names sorted alphabetically:
-`reparameterise` canonicalises its keywords that way before dispatching, so
-a method registered under `Val((:sd, :mean))` is never found. The
-[Public API](@ref public-api) documents the hook.
+A family is registered with two methods, documented in [Adding a reparameterisation](@ref adding-a-reparameterisation), with the reference in [Public API](@ref public-api).
 
 ## Rescaling a moment
 
@@ -125,6 +107,8 @@ rather than applying the factor under different semantics.
 - Work through [Priors on moments](@ref priors-on-moments) to see what a
   prior on a moment implies in native coordinates, and how to fit one.
 - Want the full interface? See the [Public API](@ref public-api).
+- Registering a family of your own? See
+  [Adding a reparameterisation](@ref adding-a-reparameterisation).
 - Want to report a problem or ask a question? Open an issue or start a
   discussion on the [GitHub repository](https://github.com/EpiAware/ReparameterisedDistributions.jl).
 

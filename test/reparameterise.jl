@@ -73,6 +73,26 @@ end
     @test all(>(0), draws)
 end
 
+@testitem "reparameterise: a single rand(rng, d) draw matches native" begin
+    using Distributions, Random
+
+    # The batched `rand(rng, d, n)` test above goes through Distributions.jl's
+    # own n-sample machinery, which draws via `sampler(d)` rather than this
+    # single-draw method. This exercises `Base.rand(rng::AbstractRNG, d)`
+    # itself: reproducible for a seeded RNG, and identical to drawing from
+    # the native distribution with the same seed, since it is exactly a
+    # delegation to `rand(rng, native(d))`.
+    d = reparameterise(Gamma; mean = 8.0, sd = 3.0)
+    nd = native(d)
+
+    @test rand(Xoshiro(1), d) == rand(Xoshiro(1), d)
+    @test rand(Xoshiro(1), d) == rand(Xoshiro(1), nd)
+    @test rand(Xoshiro(2), d) == rand(Xoshiro(2), nd)
+    # A different seed gives a different draw, so the match above is not
+    # merely because the distribution's density is trivial to draw from.
+    @test rand(Xoshiro(1), d) != rand(Xoshiro(2), d)
+end
+
 @testitem "reparameterise: accepts an instance, taking only its family" begin
     using Distributions
 
@@ -128,9 +148,9 @@ end
     # deviation converts to a native distribution that is not just valid but
     # IDENTICAL to the one a positive standard deviation gives — so without the
     # guard the density would be finite, equal to the density at +sd, and the
-    # sign would be unidentifiable. `to_native` guards before doing that
-    # algebra, so `native` never reaches the aliased distribution and throws
-    # instead; the wrapper refuses the invalid point either way.
+    # sign would be unidentifiable. `valid_moments` guards before `native`
+    # reaches that algebra, so it throws instead of returning the aliased
+    # distribution; the wrapper refuses the invalid point either way.
     bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
     good = reparameterise(LogNormal; mean = 8.0, sd = 1.0, check_args = false)
     @test_throws DomainError native(bad)
@@ -138,23 +158,48 @@ end
     @test isfinite(logpdf(good, 7.5))
 end
 
-@testitem "to_native: nothing means no member of the family, checked first" begin
+@testitem "reparameterise: an overflowing moment does not throw either" begin
     using Distributions
 
-    # The guard runs before any algebra: a negative `sd` never reaches the
-    # `sqrt`/squaring that would otherwise alias it onto a valid distribution.
-    @test to_native(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) === nothing
+    # #88: `mean` and `sd` can both be genuinely positive — passing
+    # `valid_moments`'s own `mean > 0 && sd > 0` check — and still not
+    # describe a valid Gamma. That check covers the moments, not the native
+    # parameters the closed form derives from them: `scale = sd^2 / mean`
+    # squares `sd`, so a large enough `sd` overflows `Float64` to `Inf`,
+    # and `shape = mean / scale` then comes back exactly `0.0`. A model's
+    # `check_args = true` default catches this at construction and throws;
+    # `check_args = false` avoids that throw, but does not fix the
+    # underlying guard-coverage gap — the density it currently gives back
+    # is `NaN`, not the `-Inf` the package's own docs promise for an
+    # invalid point. That is worth pinning as-is (it does not throw) rather
+    # than asserting it is the intended contract.
+    overflowed = reparameterise(Gamma; mean = 1e150, sd = 1e200,
+        check_args = false)
+    @test isnan(logpdf(overflowed, 4.0))
+    @test isnan(pdf(overflowed, 4.0))
+end
+
+@testitem "valid_moments: false means no member of the family, checked first" begin
+    using Distributions
+    using ReparameterisedDistributions: to_native, valid_moments
+
+    # `valid_moments` is checked before `to_native` ever runs, so `to_native`
+    # itself never needs to guard: it is called only on parameters already
+    # known valid, and always returns a concrete distribution, never
+    # `nothing`.
+    @test valid_moments(LogNormal, Val((:mean, :sd)), (8.0, -1.0)) == false
+    @test valid_moments(LogNormal, Val((:mean, :sd)), (8.0, 1.0)) == true
     @test to_native(LogNormal, Val((:mean, :sd)), (8.0, 1.0)) isa LogNormal
 
     # The delegating `(mean, var)` methods must guard `var > 0` themselves,
-    # before the `sqrt` — a negative variance must come back `nothing`, not
-    # throw from inside `sqrt`.
-    @test to_native(LogNormal, Val((:mean, :var)), (8.0, -4.0)) === nothing
-    @test to_native(Gamma, Val((:mean, :var)), (8.0, -4.0)) === nothing
-    @test to_native(Beta, Val((:mean, :var)), (0.3, -0.01)) === nothing
-    @test to_native(InverseGaussian, Val((:mean, :var)), (3.0, -4.0)) ===
-          nothing
-    @test to_native(Weibull, Val((:mean, :var)), (8.0, -9.0)) === nothing
+    # before the `sqrt` inside the delegated `(mean, sd)` check — a negative
+    # variance must come back `false`, not throw from inside `sqrt`.
+    @test valid_moments(LogNormal, Val((:mean, :var)), (8.0, -4.0)) == false
+    @test valid_moments(Gamma, Val((:mean, :var)), (8.0, -4.0)) == false
+    @test valid_moments(Beta, Val((:mean, :var)), (0.3, -0.01)) == false
+    @test valid_moments(InverseGaussian, Val((:mean, :var)), (3.0, -4.0)) ==
+          false
+    @test valid_moments(Weibull, Val((:mean, :var)), (8.0, -9.0)) == false
 end
 
 @testitem "loglikelihood: an invalid wrapper is guarded, not silently wrong" begin
@@ -163,8 +208,8 @@ end
     # #80: the batched `loglikelihood` used to call `loglikelihood(native(d),
     # x)` with no guard at all, so an invalid `check_args = false` wrapper
     # gave `-Inf` from scalar `logpdf` but a finite, wrong answer from the
-    # batched path. The single hook forces the guard to be written, because
-    # `nothing` cannot be passed to `Distributions.loglikelihood`.
+    # batched path. `loglikelihood` now checks `valid_moments` itself, the
+    # same way `logpdf` and `pdf` do, rather than delegating to `native`.
     bad = reparameterise(LogNormal; mean = 8.0, sd = -1.0, check_args = false)
     obs = [7.5, 8.0, 9.0]
 
@@ -194,10 +239,14 @@ end
     nd = native(d)
 
     @test mode(d) ≈ mode(nd)
+    @test modes(d) ≈ modes(nd)
     @test skewness(d) ≈ skewness(nd)
     @test kurtosis(d) ≈ kurtosis(nd)
     @test entropy(d) ≈ entropy(nd)
     @test mgf(d, 0.1) ≈ mgf(nd, 0.1)
+    @test cf(d, 0.1) ≈ cf(nd, 0.1)
+    @test cf(d, -0.3) ≈ cf(nd, -0.3)
+    @test cf(d, 0.0) ≈ cf(nd, 0.0)
     @test median(d) ≈ median(nd)
     @test std(d) ≈ std(nd)
 end
@@ -214,8 +263,10 @@ end
     using Distributions
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
-    @test occursin("mean = 8.0", sprint(show, d))
-    @test occursin("sd = 2.0", sprint(show, d))
+    # Pinned to the exact string, not just a substring, so a fallback to
+    # verbose default printing is caught even if it still happens to
+    # contain "mean = 8.0" somewhere in the noise.
+    @test sprint(show, d) == "reparameterise(LogNormal; mean = 8.0, sd = 2.0)"
 end
 
 @testitem "reparameterise: MIME text/plain show also reports the native distribution" begin
@@ -223,9 +274,15 @@ end
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     out = sprint(show, MIME("text/plain"), d)
-    @test occursin("mean = 8.0", out)
-    @test occursin("native:", out)
+    @test out ==
+          "reparameterise(LogNormal; mean = 8.0, sd = 2.0)\n" *
+          "  native: " * sprint(show, native(d))
     @test occursin("LogNormal", out)
+
+    invalid = reparameterise(
+        LogNormal; mean = 8.0, sd = -1.0, check_args = false)
+    @test occursin("invalid parameters", sprint(show, MIME("text/plain"),
+        invalid))
 end
 
 @testitem "reparameterise: the rebuild hook promotes like the front door" begin

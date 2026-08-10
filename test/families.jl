@@ -423,3 +423,100 @@ end
     @inferred logpdf(dig, 2.0)
     @inferred mean(dig)
 end
+
+@testitem "every registered to_native is concrete, never a Nothing union" begin
+    using Distributions, Test
+    import ReparameterisedDistributions as RD
+
+    # #86: a `to_native` returning `Union{Nothing, D}` made Enzyme reverse
+    # mode compute a silently wrong gradient on x86_64 — no error, no
+    # warning — for the two NegativeBinomial parameterisations. The invariant
+    # the fix rests on is that no registered `to_native` may ever return
+    # `nothing`, so the differentiated call sites in `logpdf`, `pdf` and
+    # `loglikelihood` never bind a union-typed value.
+    #
+    # `@inferred` provably does NOT catch this: Julia's union-splitting
+    # narrows the OUTER return type back to a concrete `Float64` on every
+    # branch, so `@inferred logpdf(d, x)` passed before, during and after the
+    # bug. The instability is only visible one level in, on `to_native`'s own
+    # return type — which is what this checks, for every registered pair at
+    # once, so a family added later cannot reintroduce the shape unnoticed.
+    #
+    # This is a type-level check, so it holds on every platform; the bug
+    # itself only manifests on x86_64, where the AD suite is the only thing
+    # that would otherwise catch it.
+    # The 3-arg fallback's signature is a `UnionAll` over its `D` and
+    # `names`; unwrap before indexing, then drop it below because those two
+    # come out as `TypeVar`s rather than a type and a name tuple. Shared
+    # between `to_native` and `valid_moments`, whose fallbacks have the
+    # identical shape, so it also extracts the registered pairs below.
+    function _registered_pairs(f)
+        pairs = Tuple{Any, Any}[]
+        for m in methods(f)
+            # Skip any test-only registration made from another test item.
+            m.module === RD || continue
+            sig = Base.unwrap_unionall(m.sig)
+            fam = sig.parameters[2]
+            val = sig.parameters[3]
+            fam isa DataType && fam <: Type || continue
+            val isa DataType && val <: Val || continue
+            D = fam.parameters[1]
+            names = val.parameters[1]
+            D isa Type && names isa Tuple{Vararg{Symbol}} || continue
+            push!(pairs, (D, names))
+        end
+        return pairs
+    end
+
+    registered = _registered_pairs(RD.to_native)
+
+    # Guard the guard: if the extraction above silently matched nothing, the
+    # loop below would pass vacuously.
+    @test length(registered) == 16
+
+    # A `to_native` registered with no matching `valid_moments` compiles and
+    # passes every check above: the 3-arg fallback reports it always valid,
+    # so the omission is silent rather than caught here or at construction.
+    @test issetequal(registered, _registered_pairs(RD.valid_moments))
+
+    for (D, names) in registered
+        args = (Type{D}, Val{names}, NTuple{length(names), Float64})
+        rts = Base.return_types(RD.to_native, args)
+        @test length(rts) == 1
+        rt = only(rts)
+        @test !(Nothing <: rt)
+        @test rt <: D
+        @test isconcretetype(rt)
+    end
+
+    # `to_native`'s own return type is not the whole invariant: a call site
+    # could still re-check `valid_moments` and bind a `Union{Nothing, D}`
+    # itself before converting, with `to_native` staying concrete throughout.
+    # For example, this passes the check above while reinstating the bug:
+    #
+    #   nd = valid_moments(D, Val(names), d.vals) ?
+    #        to_native(D, Val(names), d.vals) : nothing
+    #   nd === nothing && return convert(_restype(d, x), -Inf)
+    #
+    # so scan the differentiated call sites' own typed IR directly for any
+    # slot or SSA value whose type is a `Union` containing `Nothing`.
+    # `optimize = false` is load-bearing: optimised IR union-splits the same
+    # way `@inferred` does and would miss exactly this.
+    function _nothing_unions(f, tt)
+        ci, = only(code_typed(f, tt; optimize = false))
+        ts = vcat(collect(something(ci.slottypes, [])),
+            collect(ci.ssavaluetypes))
+        return filter(t -> t isa Union && Nothing <: t, ts)
+    end
+
+    for d in (reparameterise(NegativeBinomial; mean = 10.0,
+        overdispersion = 0.1),
+        reparameterise(LogNormal; mean = 8.0, sd = 2.0),
+        reparameterise(Weibull; mean = 8.0, sd = 3.0))
+        @test isempty(_nothing_unions(logpdf, (typeof(d), Float64)))
+        @test isempty(_nothing_unions(pdf, (typeof(d), Float64)))
+        @test isempty(_nothing_unions(loglikelihood,
+            (typeof(d), Vector{Float64})))
+        @test isempty(_nothing_unions(native, (typeof(d),)))
+    end
+end

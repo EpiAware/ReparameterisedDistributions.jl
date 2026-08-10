@@ -60,3 +60,4 @@ worktrees/
 # Nested worktrees (the `worktrees/<name>` convention) are working state, never
 # committed. The managed block ignores `worktree-*`, not this layout.
 worktrees/
+docs/src/benchmarks/

@@ -1,9 +1,9 @@
-# The numeric seam: a family with no exact closed form still registers
-# exactly one `to_native` method, the same contract as an analytic family,
-# and calls `solve_moment` inside its own `to_native` body to run a scalar
-# root-find over a monotone moment equation. The method still guards its own
-# validity first — including the window the root-find can actually solve —
-# and returns `nothing` rather than reaching the solver on an invalid point.
+# The numeric seam: a family with no exact closed form still registers the
+# same two methods as an analytic family, `valid_moments` and `to_native`,
+# and calls `solve_moment` inside its `to_native` body to run a scalar
+# root-find over a monotone moment equation. `valid_moments` states its own
+# validity — including the window the root-find can actually solve — so the
+# solver never runs on an invalid point; `to_native` itself does not guard.
 # No trait, no registry: an unregistered pair reaches the 3-arg `to_native`
 # fallback in Reparameterised.jl by ordinary dispatch.
 #
@@ -23,24 +23,17 @@
 # `Float32`, …) — rather than in the caller's own AD type.
 #
 # This is a robustness choice, not a correctness one, and it is not
-# optional in practice. Measured directly against this package's own
-# Weibull equation: `Roots.A42` on a `ForwardDiff.Dual`-valued bracket
-# converges for many (mean, sd) pairs, but not all — `mean = 74.916,
-# sd = 1.079` (arising from an ordinary NUTS trajectory, not a contrived
-# edge case) throws `Roots.ConvergenceFailed` in `Dual` arithmetic while
-# solving instantly in `Float64`. `!=` on a `Dual` compares partials as
-# well as the value, so an internal stall/no-progress check written
-# against `Dual` equality can fail to fire even once the VALUE has
-# converged, and the iteration runs out its budget. The residual and its
-# derivative are still evaluated in the caller's own type during the
-# correction below, so this costs nothing in correctness or in which
-# types survive to the returned distribution.
+# optional in practice: a solver's own internal convergence checks can
+# fail to fire on a `Dual`-valued bracket even once the value has
+# converged, running out the iteration budget on inputs that solve
+# instantly in `Float64`. The residual and its derivative are still
+# evaluated in the caller's own type during the correction below, so this
+# costs nothing in correctness or in which types survive to the returned
+# distribution.
 #
 # The identity default keeps a plain `Float64`/`Float32` solve unchanged.
 # `ReparameterisedDistributionsForwardDiffExt` adds the `Dual`-stripping
-# method — the established remedy elsewhere in this organisation (see
-# CensoredDistributions.jl) — recursing so a higher-order tag chain still
-# reduces to a scalar.
+# method, recursing so a higher-order tag chain still reduces to a scalar.
 _primal(x::Real) = x
 
 @doc raw"
@@ -102,6 +95,13 @@ function solve_moment(::Type{D}, ::Val{names}, residual::R, deriv::G,
     lo, hi = bracket(pvals)
     f = s -> residual(s, pvals)
     _check_bracket(D, Val(names), vals, f(lo), f(hi))
+    # AD-safety invariant: the Enzyme/Mooncake extensions hold this call
+    # out of differentiation entirely (`EnzymeRules.inactive` /
+    # `Mooncake.@zero_derivative` on `_solve_moment_equation`), which is
+    # only correct because the loop below always runs immediately after
+    # and reinjects the derivative from `vals`. Moving the solve or the
+    # correction apart would silently return a zero (or garbage)
+    # gradient on those two backends; see the extensions' own comments.
     s = _solve_moment_equation(f, lo, hi)
     for _ in 1:2
         s = s - residual(s, vals) / deriv(s, vals)
@@ -129,7 +129,7 @@ end
 # --- The three ways a numeric conversion fails cleanly -----------------------
 #
 # (a), moments outside a family's numerically solvable window, is handled by
-# `to_native` itself returning `nothing` before the solve runs — the same
+# `valid_moments` reporting `false` before the solve runs — the same
 # guard-first contract as an analytical family. (b) and (c) are below.
 
 # (b) The moment equation does not change sign over the registered bracket:
