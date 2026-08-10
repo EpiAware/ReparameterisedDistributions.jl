@@ -184,7 +184,26 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         # regression at this edge is caught by the AD suite automatically,
         # rather than relying on a one-off manual check.
         ("Weibull(mean, sd) loglik (near CV window edge)",
-            _weibull_meansd_loglik, [74.916, 1.079], reals))
+            _weibull_meansd_loglik, [74.916, 1.079], reals),
+        # An INVALID point (`mean < 0`, so `valid_moments == false` and the
+        # `-Inf` short-circuit runs instead of `to_native`), not a valid one:
+        # every case above sits comfortably inside its family's valid
+        # region, so none exercises the `valid_moments == false` branch
+        # under AD, which is exactly where #86's bug lived. Measured across
+        # all six backends at this exact `θ`: every one, including
+        # ForwardDiff, returns the zero vector, with no error, which is the
+        # expected answer, not just the observed one — the loglik is the
+        # constant `-Inf` in a neighbourhood of `θ` that does not cross the
+        # `mean = 0` boundary, so its gradient there is legitimately zero,
+        # matching what a sampler wants when a proposal steps outside the
+        # support. Deliberately not the numerically-degenerate `cv_min` edge
+        # the Weibull solve has (a valid-but-precision-limited point, a
+        # different failure mode from a formally invalid one) or the
+        # window-edge scenario just above (a valid but precision-fragile
+        # point): both are about numerical degeneracy at a VALID point,
+        # which this scenario deliberately is not.
+        ("Gamma(mean, sd) loglik at invalid moments", _gamma_meansd_loglik,
+            [-8.0, 3.0], reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,
