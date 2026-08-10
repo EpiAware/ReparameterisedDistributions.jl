@@ -74,64 +74,50 @@ end
         invalid = ((3.0, -2.0), (3.0, 0.0)))
 end
 
-@testitem "test_reparameterisation catches a mis-registered pair" begin
-    using Distributions, Test
-    using ReparameterisedDistributions: test_reparameterisation
+@testitem "the checks test_reparameterisation relies on catch a bad pair" begin
+    using Distributions
+    using ReparameterisedDistributions: to_native
 
     # `test_reparameterisation` exists to catch two mistakes a valid point
     # alone never reveals: a registration reachable only under the wrong
     # (unsorted) name order, and a `to_native` whose return type admits
-    # `nothing` (the #86 defect). Both are checked here by confirming the
-    # suite actually fails on them, rather than by re-deriving the same
-    # check the helper already makes.
+    # `nothing` (the #86 defect). This checks the two predicates the
+    # helper itself uses to catch them (dispatch reachability via
+    # `which`, and `Nothing`-admission via `Base.return_types`), on a
+    # deliberately mis-registered pair, rather than running the full
+    # helper and inspecting whether it failed.
     #
-    # `test_reparameterisation` runs its own `@testset`, so calling it
-    # directly would fail this testitem too. `probe_failures` isolates that
-    # inner testset on its own stack frame and inspects its results
-    # instead of letting them propagate, the same technique Test.jl's own
-    # test suite uses to test `@testset` itself.
-    function probe_failures(f)
-        ts = Test.DefaultTestSet("probe")
-        Test.push_testset(ts)
-        ok = true
-        redirect_stdout(devnull) do
-            redirect_stderr(devnull) do
-                try
-                    f()
-                catch
-                    ok = false
-                end
-            end
-        end
-        Test.pop_testset()
-        return !ok || _has_failure(ts)
-    end
+    # Running the helper and catching its own `@test` failures was tried
+    # first, isolating them on a private `Test.DefaultTestSet` via
+    # `Test.push_testset`/`Test.pop_testset`. Those two are unexported
+    # internals, and Julia's `@testset` macro itself has no public way to
+    # ask "did this nested block fail" without them: a custom
+    # `AbstractTestSet` needs the very same internals to record itself
+    # into its parent (see `Test.finish`'s own docstring), and a nested,
+    # type-inheriting `@testset` (Julia always gives an untyped nested
+    # `@testset` its parent's type) means every `@test` inside
+    # `test_reparameterisation` would need that propagation to be
+    # visible at all. That approach broke under a Julia prerelease whose
+    # `Test` had renamed or dropped `push_testset`. Asserting the
+    # predicates directly needs nothing from `Test` beyond ordinary
+    # `@test`, so it cannot break the same way again.
 
-    function _has_failure(ts::Test.DefaultTestSet)
-        for r in ts.results
-            if r isa Test.Fail || r isa Test.Error
-                return true
-            elseif r isa Test.DefaultTestSet && _has_failure(r)
-                return true
-            end
-        end
-        return false
-    end
-
-    # Guard the guard: the probe reports no failure for a pair already
-    # known to pass the suite, so a probe that always answered `true`
-    # would not slip past the two checks below undetected.
-    @test !probe_failures() do
-        test_reparameterisation(Gamma, (:mean, :sd), (8.0, 3.0);
-            invalid = ((8.0, -1.0),))
+    # Guard the guard: a pair already known to pass the suite should
+    # pass both predicates directly, too.
+    let argtypes = (Type{Gamma}, Val{(:mean, :sd)}, Tuple{Float64, Float64})
+        fallback = which(to_native,
+            (Type{Gamma}, Val{(:_unregistered_,)}, Tuple{Float64, Float64}))
+        @test which(to_native, argtypes) !== fallback
+        rt = only(Base.return_types(to_native, argtypes))
+        @test !(Nothing <: rt)
     end
 
     # `Cauchy(location, scale)` is not registered by this package.
     # Register it under the wrong, unsorted name order, the mistake
     # `adding-a-reparameterisation.md` warns against: `reparameterise`
-    # always sorts keywords before dispatching. Asking the suite to check
-    # the canonical `(:location, :scale)` order finds no such method, only
-    # the error-raising fallback, exactly as it would for every caller of
+    # always sorts keywords before dispatching. Asking for the canonical
+    # `(:location, :scale)` order finds no such method, only the
+    # error-raising fallback, exactly as it would for every caller of
     # `reparameterise` on an uncanonically registered family.
     function ReparameterisedDistributions.valid_moments(
             ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
@@ -145,8 +131,11 @@ end
         return Cauchy(location, scale; check_args = false)
     end
 
-    @test probe_failures() do
-        test_reparameterisation(Cauchy, (:location, :scale), (0.0, 1.0))
+    let argtypes = (Type{Cauchy}, Val{(:location, :scale)},
+            Tuple{Float64, Float64})
+        fallback = which(to_native,
+            (Type{Cauchy}, Val{(:_unregistered_,)}, Tuple{Float64, Float64}))
+        @test which(to_native, argtypes) === fallback
     end
 
     # `Laplace(mean, var)` is not registered by this package either.
@@ -166,8 +155,10 @@ end
         return Laplace(m, sqrt(v / oftype(v, 2)); check_args = false)
     end
 
-    @test probe_failures() do
-        test_reparameterisation(Laplace, (:mean, :var), (3.0, 2.0))
+    let argtypes = (Type{Laplace}, Val{(:mean, :var)},
+            Tuple{Float64, Float64})
+        rt = only(Base.return_types(to_native, argtypes))
+        @test Nothing <: rt
     end
 end
 
