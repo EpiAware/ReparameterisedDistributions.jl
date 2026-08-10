@@ -23,24 +23,17 @@
 # `Float32`, …) — rather than in the caller's own AD type.
 #
 # This is a robustness choice, not a correctness one, and it is not
-# optional in practice. Measured directly against this package's own
-# Weibull equation: `Roots.A42` on a `ForwardDiff.Dual`-valued bracket
-# converges for many (mean, sd) pairs, but not all — `mean = 74.916,
-# sd = 1.079` (arising from an ordinary NUTS trajectory, not a contrived
-# edge case) throws `Roots.ConvergenceFailed` in `Dual` arithmetic while
-# solving instantly in `Float64`. `!=` on a `Dual` compares partials as
-# well as the value, so an internal stall/no-progress check written
-# against `Dual` equality can fail to fire even once the VALUE has
-# converged, and the iteration runs out its budget. The residual and its
-# derivative are still evaluated in the caller's own type during the
-# correction below, so this costs nothing in correctness or in which
-# types survive to the returned distribution.
+# optional in practice: a solver's own internal convergence checks can
+# fail to fire on a `Dual`-valued bracket even once the value has
+# converged, running out the iteration budget on inputs that solve
+# instantly in `Float64`. The residual and its derivative are still
+# evaluated in the caller's own type during the correction below, so this
+# costs nothing in correctness or in which types survive to the returned
+# distribution.
 #
 # The identity default keeps a plain `Float64`/`Float32` solve unchanged.
 # `ReparameterisedDistributionsForwardDiffExt` adds the `Dual`-stripping
-# method — the established remedy elsewhere in this organisation (see
-# CensoredDistributions.jl) — recursing so a higher-order tag chain still
-# reduces to a scalar.
+# method, recursing so a higher-order tag chain still reduces to a scalar.
 _primal(x::Real) = x
 
 @doc raw"

@@ -1,45 +1,11 @@
-# `_solve_moment_equation(f, lo, hi)` is the package extension seam
-# (`ReparameterisedDistributionsRootsExt`) that runs the scalar root-find
-# for a numeric family's `to_native` (currently only `Weibull(mean, sd)`,
-# `src/families.jl`). `solve_moment` (`src/numeric.jl`) calls it on
-# `vals` already stripped to its primal via `_primal`, then recovers the
-# exact derivative afterwards with two steps of an implicit-function-theorem
-# correction: `s` is a root of `residual`, so `s - residual(s, vals) /
-# deriv(s, vals)` leaves the VALUE unchanged to machine precision while
-# making the DERIVATIVE exactly `-residual_vals / deriv`, regardless of what
-# derivative `s` itself carries in.
+# Enzyme traces into `_solve_moment_equation`'s root-find by dataflow, so
+# this rule marks it `inactive` while `solve_moment` (`src/numeric.jl`)
+# supplies the real derivative via an implicit-function-theorem
+# correction; this rule must stay paired with that correction or the
+# gradient goes silently wrong.
 #
-# `_primal` only strips a `ForwardDiff.Dual`/`ReverseDiff.TrackedReal`
-# wrapper (see the extensions for those backends); Enzyme carries no such
-# wrapper type; it tracks activity by dataflow, not by value type, so
-# `_primal`'s identity method on a plain `Real` does not stop Enzyme
-# statically tracing INTO `_solve_moment_equation` and from there into
-# `Roots.find_zero`'s own internals — where it aborts with
-# `Enzyme.Compiler.IllegalTypeAnalysisException` (measured directly against
-# the Weibull moment equation, on both `Enzyme.Forward` and `Enzyme.Reverse`).
-# Marking the call `EnzymeRules.inactive` runs it on the primal unchanged and
-# treats the returned root as `Const`, so Enzyme never type-analyses Roots'
-# internals while the IFT correction above still supplies the real
-# derivative afterwards from `vals`, exactly as it does for ForwardDiff.
-# `inactive` covers every activity / batch-width / mode permutation
-# uniformly, matching `_window_quantile`'s treatment in
-# CensoredDistributions.jl and ConvolvedDistributions.jl, and `primal`'s in
-# EpiAwareADTools.jl. `args...` (rather than typing `f`/`lo`/`hi`) matches
-# any closure `f` a family's `to_native` builds, since the closure's own
-# type differs per registered family.
-#
-# KNOWN LIMITATION — Hessians are NOT supported through this rule. A
-# `DifferentiationInterface.hessian` call over the Weibull numeric path
-# under either `AutoEnzyme` mode throws an internal Enzyme codegen
-# `AssertionError` (`codegen_i=2 > length(codegen_types)=1 ...  GHOST`);
-# the identical call against a closed-form family (e.g. `LogNormal`)
-# succeeds, so this is specific to differentiating THROUGH this
-# `inactive` rule at second order, not a general Enzyme limitation. Use
-# `AutoForwardDiff` (or `SecondOrder(AutoForwardDiff(), AutoForwardDiff())`)
-# for a Hessian that touches a numeric (Weibull) conversion; see
-# `test/ad/scenarios.jl` for the regression test covering this and
-# `ReparameterisedDistributionsMooncakeExt` for Mooncake's (worse)
-# failure mode on the same call.
+# Hessians are not supported through this path under Enzyme; use
+# ForwardDiff for a Hessian that touches a numeric (Weibull) conversion.
 module ReparameterisedDistributionsEnzymeExt
 
 using ReparameterisedDistributions: _solve_moment_equation

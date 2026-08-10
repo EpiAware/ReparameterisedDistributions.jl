@@ -1,37 +1,16 @@
 # `_solve_moment_equation`'s Mooncake counterpart to the Enzyme rule in
-# `ReparameterisedDistributionsEnzymeExt` — see that file for the full
-# derivation of why the implicit-function-theorem correction in
-# `solve_moment` (`src/numeric.jl`) still recovers the exact derivative once
-# this call is held out of AD. Measured directly against the Weibull moment
-# equation, Mooncake traces INTO `_solve_moment_equation` on both
-# `AutoMooncake` and `AutoMooncakeForward` and aborts with an `ArgumentError`
-# ("not permissible to bitcast to a differentiable type during AD") from
-# `Roots.find_zero`'s own internals.
+# `ReparameterisedDistributionsEnzymeExt`: Mooncake also traces into the
+# root-find, so `@zero_derivative` holds it out of AD while `solve_moment`
+# supplies the real derivative via its implicit-function-theorem
+# correction. `Any` in the closure position matches every family's own
+# closure type.
 #
-# `@zero_derivative` (no mode argument: covers both ForwardMode and
-# ReverseMode) registers the primitive and generates a zero `frule!!` and a
-# zero `rrule!!`, so the root's VALUE still comes back correct (the primal
-# call runs unchanged) while its derivative is cut — exactly what
-# `EnzymeRules.inactive` does for Enzyme, and what the `_primal` strip
-# already does for ForwardDiff/ReverseDiff (`src/numeric.jl`). `Any` in the
-# closure position (rather than a concrete type) matches every family's own
-# `f` closure, since each registered family builds a differently-typed one;
-# mirrors the `Any` ctor position in CensoredDistributions'
-# `_ctor_has_check_args` Mooncake rule for the same reason.
-#
-# KNOWN LIMITATION — Hessians are NOT supported through this rule, and this
-# one is worse than Enzyme's: `DifferentiationInterface.hessian` over the
-# Weibull numeric path with `SecondOrder(AutoForwardDiff(), AutoMooncake())`
-# (ForwardDiff outer, Mooncake inner — differentiating a `ForwardDiff.Dual`
-# through this `@zero_derivative` rule) does not raise a catchable Julia
-# exception at all; it hits an LLVM assertion in Enzyme's
-# `AdjointGenerator.h` (Mooncake's Enzyme-derived rule compiler) and
-# **aborts the whole process** (`Abort trap: 6`). Deliberately not covered
-# by an automated test anywhere in this package for exactly that reason — a
-# process abort cannot be caught by `@test`/`@test_broken` and would take
-# down whichever CI job ran it with no diagnostic. Use `AutoForwardDiff`
-# (or `SecondOrder(AutoForwardDiff(), AutoForwardDiff())`) for a Hessian
-# that touches a numeric (Weibull) conversion.
+# Hessians are not supported through this path, and worse than Enzyme's
+# failure: `SecondOrder(AutoForwardDiff(), AutoMooncake())` over the
+# Weibull numeric path aborts the whole process rather than raising a
+# catchable exception, so it is deliberately not covered by an automated
+# test. Use `AutoForwardDiff` for a Hessian that touches a numeric
+# (Weibull) conversion.
 module ReparameterisedDistributionsMooncakeExt
 
 using ReparameterisedDistributions: _solve_moment_equation
