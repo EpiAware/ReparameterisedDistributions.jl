@@ -73,6 +73,26 @@ end
     @test all(>(0), draws)
 end
 
+@testitem "reparameterise: a single rand(rng, d) draw matches native" begin
+    using Distributions, Random
+
+    # The batched `rand(rng, d, n)` test above goes through Distributions.jl's
+    # own n-sample machinery, which draws via `sampler(d)` rather than this
+    # single-draw method. This exercises `Base.rand(rng::AbstractRNG, d)`
+    # itself: reproducible for a seeded RNG, and identical to drawing from
+    # the native distribution with the same seed, since it is exactly a
+    # delegation to `rand(rng, native(d))`.
+    d = reparameterise(Gamma; mean = 8.0, sd = 3.0)
+    nd = native(d)
+
+    @test rand(Xoshiro(1), d) == rand(Xoshiro(1), d)
+    @test rand(Xoshiro(1), d) == rand(Xoshiro(1), nd)
+    @test rand(Xoshiro(2), d) == rand(Xoshiro(2), nd)
+    # A different seed gives a different draw, so the match above is not
+    # merely because the distribution's density is trivial to draw from.
+    @test rand(Xoshiro(1), d) != rand(Xoshiro(2), d)
+end
+
 @testitem "reparameterise: accepts an instance, taking only its family" begin
     using Distributions
 
@@ -197,10 +217,14 @@ end
     nd = native(d)
 
     @test mode(d) ≈ mode(nd)
+    @test modes(d) ≈ modes(nd)
     @test skewness(d) ≈ skewness(nd)
     @test kurtosis(d) ≈ kurtosis(nd)
     @test entropy(d) ≈ entropy(nd)
     @test mgf(d, 0.1) ≈ mgf(nd, 0.1)
+    @test cf(d, 0.1) ≈ cf(nd, 0.1)
+    @test cf(d, -0.3) ≈ cf(nd, -0.3)
+    @test cf(d, 0.0) ≈ cf(nd, 0.0)
     @test median(d) ≈ median(nd)
     @test std(d) ≈ std(nd)
 end

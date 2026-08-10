@@ -376,9 +376,6 @@ function to_native(::Type{D}, ::Val{names}, vals) where {D, names}
         "in the package docs"))
 end
 
-# The alternative parameter names this wrapper was built with.
-_names(::Reparameterised{D, names}) where {D, names} = names
-
 # --- Distributions.jl interface --------------------------------------------
 #
 # The moments are the parameters: `params` reports the alternative values, so
