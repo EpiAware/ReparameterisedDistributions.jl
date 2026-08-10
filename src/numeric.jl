@@ -102,6 +102,13 @@ function solve_moment(::Type{D}, ::Val{names}, residual::R, deriv::G,
     lo, hi = bracket(pvals)
     f = s -> residual(s, pvals)
     _check_bracket(D, Val(names), vals, f(lo), f(hi))
+    # AD-safety invariant: the Enzyme/Mooncake extensions hold this call
+    # out of differentiation entirely (`EnzymeRules.inactive` /
+    # `Mooncake.@zero_derivative` on `_solve_moment_equation`), which is
+    # only correct because the loop below always runs immediately after
+    # and reinjects the derivative from `vals`. Moving the solve or the
+    # correction apart would silently return a zero (or garbage)
+    # gradient on those two backends; see the extensions' own comments.
     s = _solve_moment_equation(f, lo, hi)
     for _ in 1:2
         s = s - residual(s, vals) / deriv(s, vals)

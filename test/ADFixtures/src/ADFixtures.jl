@@ -171,7 +171,20 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         ("InverseGaussian(mean, sd) loglik", _invgauss_meansd_loglik,
             [3.0, 2.0], reals),
         ("Weibull(mean, sd) loglik", _weibull_meansd_loglik, [8.0, 3.0],
-            reals))
+            reals),
+        # Near the fragile edge of the numerically solvable CV window
+        # (`_weibull_shape_max` in src/families.jl): `mean = 74.916, sd =
+        # 1.079` is the point `solve_moment`'s own comments in
+        # src/numeric.jl single out as one where a bracketed solve in
+        # `Dual` arithmetic is unreliable even though the corrected
+        # derivative is exact. It sits inside the solvable window, not on
+        # its boundary — AT `cv_min` itself every backend (including
+        # ForwardDiff) degrades to NaN/Inf, a separate, pre-existing shared
+        # numerical edge unrelated to this scenario. Registered so a
+        # regression at this edge is caught by the AD suite automatically,
+        # rather than relying on a one-off manual check.
+        ("Weibull(mean, sd) loglik (near CV window edge)",
+            _weibull_meansd_loglik, [74.916, 1.079], reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,
@@ -212,25 +225,23 @@ broken_scenario_names() = String[]
 # The Weibull scenario is the one NUMERIC family (src/numeric.jl): its
 # conversion runs a scalar root-find (Roots.jl, via
 # `ReparameterisedDistributionsRootsExt`) rather than exact algebra.
-# ForwardDiff and ReverseDiff are unaffected (the implicit-function-theorem
-# correction supplies the derivative regardless of how the root itself was
-# found — see `_primal` in src/numeric.jl), but Enzyme and Mooncake trace
-# INTO Roots' own internals when building a reverse-mode rule for the
-# solve, and fail there: measured, `Enzyme.Compiler.IllegalTypeAnalysisException`
-# for both Enzyme variants, an `ArgumentError` (bitcast to a differentiable
-# type) for both Mooncake variants. Recorded here rather than left to crash
-# `task test-ad`; a follow-up can apply the same `_primal`-stripping /
-# `EnzymeRules.inactive` / `Mooncake.@zero_derivative` treatment
-# `_solve_moment_equation` already gets for ForwardDiff to these four too.
+# ForwardDiff and ReverseDiff were always unaffected (the
+# implicit-function-theorem correction supplies the derivative regardless of
+# how the root itself was found — see `_primal` in src/numeric.jl); Enzyme
+# and Mooncake used to trace INTO Roots' own internals when building a
+# derivative rule for the solve and fail there
+# (`Enzyme.Compiler.IllegalTypeAnalysisException` for both Enzyme variants,
+# an `ArgumentError` — "not permissible to bitcast to a differentiable type
+# during AD" — for both Mooncake variants). `ReparameterisedDistributionsEnzymeExt`
+# and `ReparameterisedDistributionsMooncakeExt` now give
+# `_solve_moment_equation` the same `EnzymeRules.inactive` /
+# `Mooncake.@zero_derivative` treatment `_primal` already gets, so the IFT
+# correction supplies the derivative on all six backends; verified against
+# the ForwardDiff reference at several (mean, sd) points including the CV
+# window's edge, on both arm64 and linux/amd64.
 "Per-backend broken scenario names (`Dict{String, Set{String}}`)."
 function backend_broken_scenarios()
-    weibull = "Weibull(mean, sd) loglik"
-    return Dict(
-        "Enzyme forward" => Set([weibull]),
-        "Enzyme reverse" => Set([weibull]),
-        "Mooncake reverse" => Set([weibull]),
-        "Mooncake forward" => Set([weibull])
-    )
+    return Dict{String, Set{String}}()
 end
 
 "Per-backend scenario names too unstable to run at all."
