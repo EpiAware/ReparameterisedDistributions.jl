@@ -160,6 +160,7 @@ end
 
 @testitem "reparameterise: an overflowing moment does not throw either" begin
     using Distributions
+    using ReparameterisedDistributions: valid_moments
 
     # #93: `mean` and `sd` both positive passes the old
     # `mean > 0 && sd > 0` check, but `scale = sd^2 / mean` overflows and
