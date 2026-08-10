@@ -73,3 +73,124 @@ end
     test_reparameterisation(Laplace, (:mean, :sd), (3.0, 2.0);
         invalid = ((3.0, -2.0), (3.0, 0.0)))
 end
+
+@testitem "test_reparameterisation catches a mis-registered pair" begin
+    using Distributions, Test
+    using ReparameterisedDistributions: test_reparameterisation
+
+    # `test_reparameterisation` exists to catch two mistakes a valid point
+    # alone never reveals: a registration reachable only under the wrong
+    # (unsorted) name order, and a `to_native` whose return type admits
+    # `nothing` (the #86 defect). Both are checked here by confirming the
+    # suite actually fails on them, rather than by re-deriving the same
+    # check the helper already makes.
+    #
+    # `test_reparameterisation` runs its own `@testset`, so calling it
+    # directly would fail this testitem too. `probe_failures` isolates that
+    # inner testset on its own stack frame and inspects its results
+    # instead of letting them propagate, the same technique Test.jl's own
+    # test suite uses to test `@testset` itself.
+    function probe_failures(f)
+        ts = Test.DefaultTestSet("probe")
+        Test.push_testset(ts)
+        ok = true
+        redirect_stdout(devnull) do
+            redirect_stderr(devnull) do
+                try
+                    f()
+                catch
+                    ok = false
+                end
+            end
+        end
+        Test.pop_testset()
+        return !ok || _has_failure(ts)
+    end
+
+    function _has_failure(ts::Test.DefaultTestSet)
+        for r in ts.results
+            if r isa Test.Fail || r isa Test.Error
+                return true
+            elseif r isa Test.DefaultTestSet && _has_failure(r)
+                return true
+            end
+        end
+        return false
+    end
+
+    # Guard the guard: the probe reports no failure for a pair already
+    # known to pass the suite, so a probe that always answered `true`
+    # would not slip past the two checks below undetected.
+    @test !probe_failures() do
+        test_reparameterisation(Gamma, (:mean, :sd), (8.0, 3.0);
+            invalid = ((8.0, -1.0),))
+    end
+
+    # `Cauchy(location, scale)` is not registered by this package.
+    # Register it under the wrong, unsorted name order, the mistake
+    # `adding-a-reparameterisation.md` warns against: `reparameterise`
+    # always sorts keywords before dispatching. Asking the suite to check
+    # the canonical `(:location, :scale)` order finds no such method, only
+    # the error-raising fallback, exactly as it would for every caller of
+    # `reparameterise` on an uncanonically registered family.
+    function ReparameterisedDistributions.valid_moments(
+            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
+        scale, _ = vals
+        return scale > 0
+    end
+
+    function ReparameterisedDistributions.to_native(
+            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
+        scale, location = vals
+        return Cauchy(location, scale; check_args = false)
+    end
+
+    @test probe_failures() do
+        test_reparameterisation(Cauchy, (:location, :scale), (0.0, 1.0))
+    end
+
+    # `Laplace(mean, var)` is not registered by this package either.
+    # `to_native` here is exactly the #86 shape: a branch that can return
+    # `nothing`, so its inferred return type is a `Union` even though this
+    # particular call (`var = 2.0 > 0`) never actually takes that branch.
+    function ReparameterisedDistributions.valid_moments(
+            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+        _, v = vals
+        return v > 0
+    end
+
+    function ReparameterisedDistributions.to_native(
+            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+        m, v = vals
+        v <= 0 && return nothing
+        return Laplace(m, sqrt(v / oftype(v, 2)); check_args = false)
+    end
+
+    @test probe_failures() do
+        test_reparameterisation(Laplace, (:mean, :var), (3.0, 2.0))
+    end
+end
+
+@testitem "No Test extension loaded: the stub's own error" begin
+    using Distributions
+    using ReparameterisedDistributions: test_reparameterisation
+
+    # The realistic "Test not loaded" path cannot be produced in-process:
+    # every test item here already has `Test` loaded, which triggers
+    # `ReparameterisedDistributionsTestExt` regardless of who asked for
+    # it, so the extension is always active by the time any test runs.
+    # This asserts directly on the stub method instead, with a `names`
+    # type (a `Vector`, not a `Tuple{Vararg{Symbol}}`) that only the
+    # core's generic `(D, names, vals; kwargs...)` method, not the
+    # extension's more specific one, can match. Mirrors the technique
+    # already used for `_solve_moment_equation`'s stub in test/numeric.jl.
+    @test_throws ArgumentError test_reparameterisation(
+        LogNormal, [:mean, :sd], (8.0, 2.0))
+    try
+        test_reparameterisation(LogNormal, [:mean, :sd], (8.0, 2.0))
+    catch e
+        msg = sprint(showerror, e)
+        @test occursin("Test", msg)
+        @test occursin("ReparameterisedDistributionsTestExt", msg)
+    end
+end
