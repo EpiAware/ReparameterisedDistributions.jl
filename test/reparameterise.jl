@@ -158,6 +158,27 @@ end
     @test isfinite(logpdf(good, 7.5))
 end
 
+@testitem "reparameterise: an overflowing moment does not throw either" begin
+    using Distributions
+
+    # #88: `mean` and `sd` can both be genuinely positive — passing
+    # `valid_moments`'s own `mean > 0 && sd > 0` check — and still not
+    # describe a valid Gamma. That check covers the moments, not the native
+    # parameters the closed form derives from them: `scale = sd^2 / mean`
+    # squares `sd`, so a large enough `sd` overflows `Float64` to `Inf`,
+    # and `shape = mean / scale` then comes back exactly `0.0`. A model's
+    # `check_args = true` default catches this at construction and throws;
+    # `check_args = false` avoids that throw, but does not fix the
+    # underlying guard-coverage gap — the density it currently gives back
+    # is `NaN`, not the `-Inf` the package's own docs promise for an
+    # invalid point. That is worth pinning as-is (it does not throw) rather
+    # than asserting it is the intended contract.
+    overflowed = reparameterise(Gamma; mean = 1e150, sd = 1e200,
+        check_args = false)
+    @test isnan(logpdf(overflowed, 4.0))
+    @test isnan(pdf(overflowed, 4.0))
+end
+
 @testitem "valid_moments: false means no member of the family, checked first" begin
     using Distributions
 
@@ -241,8 +262,10 @@ end
     using Distributions
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
-    @test occursin("mean = 8.0", sprint(show, d))
-    @test occursin("sd = 2.0", sprint(show, d))
+    # Pinned to the exact string, not just a substring, so a fallback to
+    # verbose default printing is caught even if it still happens to
+    # contain "mean = 8.0" somewhere in the noise.
+    @test sprint(show, d) == "reparameterise(LogNormal; mean = 8.0, sd = 2.0)"
 end
 
 @testitem "reparameterise: MIME text/plain show also reports the native distribution" begin
@@ -250,8 +273,9 @@ end
 
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     out = sprint(show, MIME("text/plain"), d)
-    @test occursin("mean = 8.0", out)
-    @test occursin("native:", out)
+    @test out ==
+          "reparameterise(LogNormal; mean = 8.0, sd = 2.0)\n" *
+          "  native: " * sprint(show, native(d))
     @test occursin("LogNormal", out)
 
     invalid = reparameterise(
