@@ -161,17 +161,10 @@ end
 @testitem "reparameterise: an overflowing moment does not throw either" begin
     using Distributions
 
-    # #93 (following on from #88): `mean` and `sd` can both be genuinely
-    # positive — passing `valid_moments`'s own `mean > 0 && sd > 0` check —
-    # and still not describe a valid Gamma. That check used to cover only
-    # the moments, not the native parameters the closed form derives from
-    # them: `scale = sd^2 / mean` squares `sd`, so a large enough `sd`
-    # overflows `Float64` to `Inf`, and `shape = mean / scale` then comes
-    # back exactly `0.0`. A model's `check_args = true` default catches
-    # this at construction and throws; `check_args = false` avoids that
-    # throw. `valid_moments` now restates `to_native`'s own `scale`/`shape`
-    # algebra and rejects this point, so it never reaches `to_native` at
-    # all: the density is the documented `-Inf`, not `NaN`.
+    # #93: `mean` and `sd` both positive passes the old
+    # `mean > 0 && sd > 0` check, but `scale = sd^2 / mean` overflows and
+    # `shape = mean / scale` comes back `0.0`. `valid_moments` now rejects
+    # this point directly.
     overflowed = reparameterise(Gamma; mean = 1e150, sd = 1e200,
         check_args = false)
     @test valid_moments(Gamma, Val((:mean, :sd)), (1e150, 1e200)) == false

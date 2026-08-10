@@ -17,8 +17,8 @@ end
 # The conversion squares `sd / mean`, so a negative `sd` would otherwise
 # build exactly the same, valid native distribution as a positive one.
 #
-# Restates the squaring: if it overflows, `s2` follows it to `Inf` and
-# `logpdf` gives `NaN`, not `-Inf`.
+# Restates `to_native`'s `(sd / mean)^2`: if that overflows, `s2` follows
+# it to `Inf` and `logpdf` gives `NaN`, not `-Inf`.
 function valid_moments(::Type{LogNormal}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     return mean > 0 && sd > 0 && isfinite((sd / mean)^2)
@@ -79,13 +79,9 @@ function to_native(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
     return Gamma(shape, mean / shape; check_args = false)
 end
 
-# The shape is native here, but `to_native`'s `scale = mean / shape` is
-# still a division that can overflow (`shape` small enough) or underflow
-# to exactly zero (`shape` large enough), producing the same `NaN`-from-
-# `logpdf` failure as the squared parameterisations above, from a
-# different, non-squaring closed form. Measured directly (not assumed from
-# the squared cases): e.g. `mean = 1.0, shape = 1e-320` gives
-# `scale = Inf`, then a `Gamma(1e-320, Inf)` whose `logpdf` is `NaN`.
+# `scale = mean / shape` overflows or underflows the same way, from a
+# non-squaring closed form (measured: `mean = 1.0, shape = 1e-320` gives
+# `scale = Inf`).
 function valid_moments(::Type{Gamma}, ::Val{(:mean, :shape)}, vals)
     mean, shape = vals
     (mean > 0 && shape > 0) || return false
@@ -107,12 +103,10 @@ function to_native(::Type{NegativeBinomial},
     return NegativeBinomial(1 / a, p; check_args = false)
 end
 
-# `a = 0` is the Poisson limit, not a NegativeBinomial: `r = 1 / a` diverges,
-# so it is rejected alongside `a < 0`. The same inversion also overflows
-# for any `a` small enough to underflow `1 / a` to `Inf` without being
-# exactly zero (measured: `a = 1e-320` gives `r = Inf`), producing a
-# `NegativeBinomial(Inf, p)` whose `logpdf` is `NaN` rather than `-Inf`;
-# restating the inversion here catches that too, not just the `a = 0` case.
+# `a = 0` is the Poisson limit, not a NegativeBinomial: `r = 1 / a`
+# diverges, so it is rejected alongside `a < 0`. `isfinite(1 / a)` also
+# catches `a` small enough to underflow the division without being
+# exactly zero (measured: `a = 1e-320` gives `r = Inf`).
 function valid_moments(::Type{NegativeBinomial},
         ::Val{(:mean, :overdispersion)}, vals)
     mean, a = vals
@@ -236,13 +230,8 @@ function to_native(::Type{InverseGaussian}, ::Val{(:mean, :sd)}, vals)
     return InverseGaussian(mean, lambda; check_args = false)
 end
 
-# Restates `to_native`'s `lambda = mean^3 / sd^2`: `mean` cubed can
-# overflow on its own (measured: `mean = 1e155, sd = 1.0` gives
-# `mean^3 = Inf`) independently of `sd`, and `sd^2` can equally overflow
-# or underflow to exactly zero, so `lambda` can come out `Inf` (or, with
-# `mean^3` and `sd^2` both `Inf`, `NaN`) either way. The resulting
-# `InverseGaussian(mean, lambda)` passes construction under
-# `check_args = false` but gives `NaN`, not `-Inf`, from `logpdf`.
+# Restates `to_native`'s `lambda = mean^3 / sd^2`: `mean^3` can overflow
+# independently of `sd` (measured: `mean = 1e155, sd = 1.0`).
 function valid_moments(::Type{InverseGaussian}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
     (mean > 0 && sd > 0) || return false
