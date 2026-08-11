@@ -297,9 +297,26 @@ broken_scenario_names() = String[]
 # correction supplies the derivative on all six backends; verified against
 # the ForwardDiff reference at several (mean, sd) points including the CV
 # window's edge, on both arm64 and linux/amd64.
+# The Frechet scenario is the generic fallback over a family whose `mean`
+# and `var` are written in terms of `SpecialFunctions.gamma`, and Enzyme
+# differentiates that function incorrectly: at 2.5 it returns 0.70316,
+# which is `digamma(2.5)`, where the derivative of `gamma` is
+# `gamma(x) * digamma(x)` — 0.93473. It is returning the derivative of
+# `loggamma` instead. Nothing in this package is involved: the same
+# mismatch appears for a bare `SpecialFunctions.gamma`, and for
+# `mean(Frechet(...))` and `var(Weibull(...))` with no wrapper in sight.
+#
+# The two Enzyme entries below are therefore quarantined rather than
+# fixed here, and the generic fallback stays covered on those backends by
+# the Normal and Poisson scenarios, whose moments reach no `gamma`. The
+# registered Weibull scenario is unaffected because its own moment
+# equation is written in `loggamma`, which Enzyme does differentiate
+# correctly.
 "Per-backend broken scenario names (`Dict{String, Set{String}}`)."
 function backend_broken_scenarios()
-    return Dict{String, Set{String}}()
+    frechet = Set(["Frechet(mean, sd) loglik (generic fallback)"])
+    return Dict{String, Set{String}}("Enzyme forward" => frechet,
+        "Enzyme reverse" => frechet)
 end
 
 "Per-backend scenario names too unstable to run at all."
