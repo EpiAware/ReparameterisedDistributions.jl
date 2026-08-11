@@ -64,6 +64,18 @@ function native_domains(::Type{D}) where {D}
     return ntuple(_ -> :positive, Val(fieldcount(Base.unwrap_unionall(D))))
 end
 
+# Read only through ordinary calls, never from inside a `@generated` body.
+# That is what lets a family register its domains at any point, including
+# after a call has already been made and compiled for it: a plain call
+# carries a backedge and is invalidated when the method appears, while
+# generated code is expanded once per signature and cached with no such
+# dependency, so it would answer from the method table as it stood at the
+# first call. Verified by registering `native_domains` for a family after
+# converting it, on call sites compiled before the registration: the
+# conversion, the predicate and the arity branch all pick the new domains
+# up. `_canonical` is the one generated function here, and it sees only
+# the parameter names.
+
 # The unconstrained coordinate and back. Branching on a `Symbol` rather
 # than dispatching on a singleton keeps this type-stable whether or not
 # the domains constant-fold: every branch returns the same type.

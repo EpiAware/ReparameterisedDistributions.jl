@@ -527,3 +527,34 @@ end
         @test all(!=(0), ForwardDiff.partials(p))
     end
 end
+
+@testitem "native_domains registered late is picked up" begin
+    using Distributions
+    import ReparameterisedDistributions as RD
+
+    # The hook is read through ordinary calls, so a family registering its
+    # domains after a conversion has already been compiled for it gets the
+    # new answer rather than a cached one. A `@generated` consumer would
+    # not: it is expanded once per signature and carries no dependency on
+    # the method table. `Cosine(mu, sigma)` has a real location the default
+    # (every parameter positive) cannot reach a negative mean with, and no
+    # other test item registers anything for it.
+    @noinline convert_it(m, s) =
+        try
+            native(reparameterise(Cosine; mean = m, sd = s))
+        catch e
+            e
+        end
+    @noinline valid(m, s) = RD.valid_moments(Cosine, Val((:mean, :sd)), (m, s))
+
+    @test RD.native_domains(Cosine) == (:positive, :positive)
+    @test convert_it(-3.0, 2.0) isa DomainError
+    @test valid(-3.0, 2.0) == false
+
+    RD.native_domains(::Type{Cosine}) = (:real, :positive)
+
+    # `var(Cosine(mu, sigma)) = sigma^2 * (1/3 - 2/pi^2)`, so the scale that
+    # gives `sd = 2.0` is `2 / sqrt(1/3 - 2/pi^2)`.
+    @test convert_it(-3.0, 2.0) ≈ Cosine(-3.0, 2.0 / sqrt(1 / 3 - 2 / pi^2))
+    @test valid(-3.0, 2.0) == true
+end
