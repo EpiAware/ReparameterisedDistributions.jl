@@ -171,27 +171,29 @@ The tuple's length is also the native parameter count, so a family whose fields 
 `native_domains` says what each parameter may be on its own.
 It cannot say how two of them must relate, and some families are defined by exactly such a relation.
 
-`Uniform(a, b)` needs `a < b`, and its mean and variance are symmetric in the two: `(a + b) / 2` and `(b - a)^2 / 12` are unchanged by swapping them.
-The moment equations therefore have two roots, one of them ordered and one not, and the solve can converge on either.
+`Arcsine(a, b)` needs `a < b`, and its mean and variance are symmetric in the two: `(a + b) / 2` and `(b - a)^2 / 8` are unchanged by swapping them.
+The moment equations therefore have two roots, one ordered and one not, and the solve can converge on either.
 
 ```@example adding
-reparameterise(Uniform; mean = 3.0, sd = 1.0)
+reparameterise(Arcsine; mean = 3.0, sd = 0.5)
 ```
 
 ```julia
-reparameterise(Uniform; mean = 1.0, sd = 0.02)  # DomainError: a must be less than b
+reparameterise(Arcsine; mean = 1.0, sd = 0.02)  # DomainError: a must be less than b
 ```
 
-Both requests describe a perfectly good `Uniform`.
-The first is found; the second converges on the mirrored pair, which the family's own constructor then rejects at construction.
+Both requests describe a perfectly good `Arcsine`.
+The first finds the ordered root; the second converges on the mirrored one, `a = 1.0283` against `b = 0.9717`, which the family's own constructor rejects at construction.
+The predicate cannot catch it, because both values are finite and both are in the domain the transform was given — it is the *relation* between them that no per-parameter domain can express.
 Under `check_args = false` it is a NaN density rather than a plausible wrong answer, but neither is what a caller wanted.
 
 This generalises to any family whose parameters are ordered or otherwise mutually constrained, and to any family whose moments are symmetric under a relabelling of its parameters.
-A two-line closed form is the answer for those:
+Registering the exact inversion is the answer for those, and it is what `Uniform` — the same shape, `(b - a)^2 / 12` for its variance — gets from the quantile-constraint inversion, which solves `mean` and `sd` for the location-scale families directly.
+For a family with no such registration, two lines does it:
 
 ```julia
-ReparameterisedDistributions.to_native(::Type{Uniform}, ::Val{(:mean, :sd)}, vals) =
-    Uniform(vals[1] - sqrt(3 * vals[2]^2), vals[1] + sqrt(3 * vals[2]^2);
+ReparameterisedDistributions.to_native(::Type{Arcsine}, ::Val{(:mean, :sd)}, vals) =
+    Arcsine(vals[1] - sqrt(2) * vals[2], vals[1] + sqrt(2) * vals[2];
         check_args = false)
 ```
 
