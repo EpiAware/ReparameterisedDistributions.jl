@@ -121,12 +121,19 @@ function _standard_residual(::Type{D}, ::Val{(:mean,)}, domains, z,
     return ((mean(nd) - m) / max(abs(m), one(m)),)
 end
 
-# Starting points, tried in order. The first is the one that is exact for
-# a location-scale family and close for a shape-and-scale one: a location
+# Starting points, tried in order. The first is exact for a
+# location-scale family and close for a shape-and-scale one: a location
 # takes the requested mean, a probability a half, and a scale-like
-# positive parameter (the last of them) the requested magnitude, leaving
-# any shape at one. The other two are the flat alternatives, all ones and
-# all at the requested magnitude, for a family the first misses.
+# positive parameter (the last of them) the requested magnitude. A
+# shape-like one starts at three rather than one, which is what makes a
+# heavy-tailed family reachable at all — `Frechet`, `Pareto`, `BetaPrime`
+# and `InverseGamma` have no finite variance below a shape of two, so a
+# seed there is a NaN residual with nowhere to step. The rest are the
+# alternatives for a family the first misses: the same point at a shape of
+# one (where an ordered pair such as `Uniform`'s bounds starts valid),
+# every parameter at three (a heavy-tailed family whose requested
+# magnitude is itself below two), every parameter at the requested
+# magnitude, and those magnitudes halving from the last parameter back.
 function _seed(domains::NTuple{N, Symbol}, m, positive::F) where {N, F}
     return ntuple(Val(N)) do i
         domain = domains[i]
@@ -138,10 +145,13 @@ end
 
 function _seed_ladder(domains::NTuple{N, Symbol}, m, sd) where {N}
     scale = max(abs(m), sd)
+    shape = oftype(m, 3)
     located = any(==(:real), domains)
-    return (_seed(domains, m, i -> located ? sd : (i == N ? scale : one(m))),
-        _seed(domains, m, i -> one(m)),
-        _seed(domains, m, i -> scale))
+    return (_seed(domains, m, i -> located ? sd : (i == N ? scale : shape)),
+        _seed(domains, m, i -> located ? sd : (i == N ? scale : one(m))),
+        _seed(domains, m, i -> shape),
+        _seed(domains, m, i -> scale),
+        _seed(domains, m, i -> scale * oftype(m, 2)^(i - N)))
 end
 
 function _standard_seeds(::Val{(:mean, :sd)}, domains, vals)

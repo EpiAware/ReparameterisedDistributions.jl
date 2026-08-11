@@ -238,28 +238,57 @@ _merit(r) = sum(abs2, r)
 # Sum of squares for the line search, largest absolute residual for the
 # convergence test: the merit has to fall on every accepted step, while
 # convergence is a statement about each equation separately.
+#
+# The stall count is what stops a request with no solution at all from
+# costing the whole iteration budget on every seed: the Armijo condition
+# accepts an arbitrarily small decrease, so an iterate walking off towards
+# a boundary it never reaches can crawl for the full hundred iterations
+# without ever failing the line search. Measured on
+# `reparameterise(Frechet; mean = -8.0, sd = 3.0)`, which no Frechet has:
+# 280us before, 20us after, against 5us for a request that solves.
 function _newton_solve(f::F, z0::NTuple{N, T}) where {F, N, T}
     z = z0
     jac = _fd_jacobian(f, z)
+    previous = T(Inf)
+    stalls = 0
     for _ in 1:_NEWTON_ITERATIONS
         r = f(z)
         all(isfinite, r) || return (z, jac, false)
-        maximum(abs, r) <= _newton_tol(T) && return (z, _fd_jacobian(f, z),
-            true)
+        # The Jacobian goes back at the point reached, not at the one
+        # before it: `solve_moments` corrects with it, and a correction is
+        # exact only from the Jacobian at the root.
+        maximum(abs, r) <= _newton_tol(T) &&
+            return (z, _fd_jacobian(f, z), true)
+        merit = _merit(r)
+        stalls = merit > (1 - T(_MIN_PROGRESS)) * previous ? stalls + 1 : 0
+        stalls >= _MAX_STALLS && break
+        previous = merit
         jac = _fd_jacobian(f, z)
         all(c -> all(isfinite, c), jac) || return (z, jac, false)
         full = _linear_solve(jac, r)
         all(isfinite, full) || return (z, jac, false)
-        # Cap the step in the unconstrained coordinates: an early Newton
-        # step from a seed far from the root is otherwise large enough to
-        # overflow `exp` and land on a NaN residual the line search can
-        # only back away from one halving at a time.
-        capped = min(one(T), T(_NEWTON_STEP_CAP) / max(maximum(abs, full),
-            eps(T)))
-        z, moved = _line_search(f, z, _scaled(full, -capped), _merit(r))
+        z, moved = _line_search(f, z, _scaled(full, -_trust_scale(z, full)),
+            merit)
         moved || break
     end
+    jac = _fd_jacobian(f, z)
     return (z, jac, maximum(abs, f(z)) <= _newton_tol(T))
+end
+
+# How much of a Newton step may be taken before the line search starts
+# halving. An early step from a seed far from the root is otherwise large
+# enough to overflow `exp` and land on a NaN residual the line search can
+# only back away from one halving at a time. The limit is relative to the
+# coordinate's own size: a step of 8 is generous in a log coordinate and
+# nowhere near enough in an unconstrained location whose scale is the
+# data's.
+function _trust_scale(z::NTuple{N, T}, δ) where {N, T}
+    s = one(T)
+    for i in 1:N
+        limit = T(_NEWTON_STEP_CAP) * max(one(T), abs(z[i]))
+        abs(δ[i]) > limit && (s = min(s, limit / abs(δ[i])))
+    end
+    return s
 end
 
 function _line_search(f::F, z::NTuple{N, T}, δ, m0) where {F, N, T}
@@ -281,6 +310,8 @@ end
 const _NEWTON_ITERATIONS = 100
 const _NEWTON_STEP_CAP = 8.0
 const _LINE_SEARCH_MIN = 1.0e-8
+const _MIN_PROGRESS = 1.0e-4
+const _MAX_STALLS = 3
 
 # Tighter than `_moment_atol`, which is what the corrected root is finally
 # held to: the primal iterate is polished twice more before that check.
