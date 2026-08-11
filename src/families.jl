@@ -343,3 +343,21 @@ function valid_moments(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
     return var > 0 && valid_moments(Weibull, Val((:mean, :sd)),
         (mean, sqrt(var)))
 end
+
+# --- Native parameter domains for the standard-moment fallback -------------
+#
+# Families with no closed form here, whose native parameters the default
+# `native_domains` (every parameter positive, see standard_moments.jl)
+# would get wrong. Each is one line, and it is what makes
+# `reparameterise(Normal; mean = -3.0, sd = 2.0)` — a mean the positive
+# orthant cannot reach — solve.
+native_domains(::Type{Normal}) = (:real, :positive)
+native_domains(::Type{Laplace}) = (:real, :positive)
+native_domains(::Type{Logistic}) = (:real, :positive)
+native_domains(::Type{Gumbel}) = (:real, :positive)
+
+# `NegativeBinomial(r, p)`: the success probability is a probability, and
+# the fallback is what answers `(:mean, :sd)` for it — the two closed forms
+# above are registered under the two dispersion conventions, not the
+# standard deviation.
+native_domains(::Type{NegativeBinomial}) = (:positive, :unit)

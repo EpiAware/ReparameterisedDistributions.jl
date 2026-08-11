@@ -13,10 +13,16 @@
 # (Weibull) conversion.
 module ReparameterisedDistributionsMooncakeExt
 
-using ReparameterisedDistributions: _solve_moment_equation
+using ReparameterisedDistributions: _solve_moment_equation,
+                                    _solve_moment_system
 using Mooncake: Mooncake
 
 Mooncake.@zero_derivative Mooncake.DefaultCtx Tuple{
     typeof(_solve_moment_equation), Any, Real, Real}
+
+# The vector counterpart, held out for the same reason: `solve_moments`
+# reinjects the derivative straight afterwards.
+Mooncake.@zero_derivative Mooncake.DefaultCtx Tuple{
+    typeof(_solve_moment_system), Any, Tuple}
 
 end
