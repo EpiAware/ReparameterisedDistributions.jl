@@ -184,7 +184,15 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         # regression at this edge is caught by the AD suite automatically,
         # rather than relying on a one-off manual check.
         ("Weibull(mean, sd) loglik (near CV window edge)",
-            _weibull_meansd_loglik, [74.916, 1.079], reals))
+            _weibull_meansd_loglik, [74.916, 1.079], reals),
+        # `mean < 0`: `valid_moments == false`, so `logpdf` is the constant
+        # `-Inf` short-circuit, never reaching `to_native`. No scenario
+        # above reaches that branch under AD — where #86's bug lived. The
+        # gradient is the zero vector on every backend, since the loglik is
+        # locally constant. Not the CV-edge cases above, which are valid
+        # but numerically fragile, a different failure mode.
+        ("Gamma(mean, sd) loglik at invalid moments", _gamma_meansd_loglik,
+            [-8.0, 3.0], reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,
