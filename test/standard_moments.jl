@@ -22,11 +22,17 @@ end
     # A family per shape of native parameter space: shape-and-scale,
     # location-and-scale, bounded, and one whose fields are not its
     # parameters (`InverseGamma` holds a `Gamma`).
+    # Every family here reaches the generic solve and stays there: the
+    # location-scale families whose mean and standard deviation invert
+    # exactly (`Normal`, `Laplace`, `Logistic`, `Uniform`, `Cauchy`,
+    # `LogNormal`) are registered elsewhere and would test that algebra
+    # instead. `Gumbel` is the one with an unconstrained location, so it
+    # is what covers the `:real` domain through this path.
     cases = ((Frechet, 8.0, 3.0), (Frechet, 8.0, 30.0), (Pareto, 8.0, 3.0),
         (InverseGamma, 8.0, 3.0), (BetaPrime, 2.0, 3.0),
         (BetaPrime, 1.0, 0.05), (Kumaraswamy, 0.3, 0.1),
-        (Normal, -3.0, 2.0), (Normal, 0.0, 1.0), (Laplace, 3.0, 2.0),
-        (Logistic, 3.0, 2.0), (Gumbel, 3.0, 2.0), (Gumbel, 500.0, 2500.0))
+        (Arcsine, 3.0, 0.5), (Gumbel, -3.0, 2.0), (Gumbel, 3.0, 2.0),
+        (Gumbel, 500.0, 2500.0))
 
     for (D, m, s) in cases
         d = reparameterise(D; mean = m, sd = s)
@@ -270,8 +276,10 @@ end
         return filter(t -> t isa Union && Nothing <: t, ts)
     end
 
+    # `Gumbel` rather than a location-scale family whose moments invert
+    # exactly elsewhere: this has to scan the generic path's own IR.
     for d in (reparameterise(Frechet; mean = 8.0, sd = 3.0),
-        reparameterise(Normal; mean = 8.0, sd = 3.0),
+        reparameterise(Gumbel; mean = 8.0, sd = 3.0),
         reparameterise(Poisson; mean = 4.0))
         @test isempty(_nothing_unions(logpdf, (typeof(d), Float64)))
         @test isempty(_nothing_unions(pdf, (typeof(d), Float64)))
@@ -290,7 +298,7 @@ end
     # registration owes one.
     test_reparameterisation(Frechet, (:mean, :sd), (8.0, 3.0);
         invalid = ((8.0, -3.0), (-8.0, 3.0)))
-    test_reparameterisation(Normal, (:mean, :sd), (-3.0, 2.0);
+    test_reparameterisation(Gumbel, (:mean, :sd), (-3.0, 2.0);
         invalid = ((-3.0, -2.0),))
     test_reparameterisation(Rayleigh, (:mean,), (3.0,); invalid = ((-3.0,),))
 end
@@ -447,15 +455,27 @@ end
 @testitem "the fallback's gradient matches an exact closed form" begin
     using Distributions, ForwardDiff
 
-    # `Normal(mean, sd)` is not registered, so this goes through the
-    # solve — and its answer is known exactly, which makes the native
-    # distribution an oracle for both the value and the gradient.
+    # The point of this item is an ORACLE: a family the generic solve
+    # answers, whose answer is also known in closed form, so a gradient
+    # that disagrees is wrong rather than merely different.
+    #
+    # `Gumbel`, not a family whose mean and standard deviation inverts
+    # exactly somewhere else — `Normal`, `Laplace`, `Logistic`, `Uniform`
+    # and `Cauchy` are all registered by the quantile-constraint
+    # inversion, so this would silently become a test of that algebra
+    # against Distributions rather than a test of the solve. A `Gumbel`
+    # has `mean = mu + gamma * beta` and `sd = beta * pi / sqrt(6)`,
+    # which inverts to the closed form below.
     obs = [4.2, 7.1, 9.8, 12.4, 6.0]
     solved(θ) = sum(
         x -> logpdf(
-            reparameterise(Normal; mean = θ[1], sd = θ[2],
+            reparameterise(Gumbel; mean = θ[1], sd = θ[2],
                 check_args = false), x), obs)
-    exact(θ) = sum(x -> logpdf(Normal(θ[1], θ[2]), x), obs)
+    function exact(θ)
+        beta = θ[2] * sqrt(6) / pi
+        mu = θ[1] - MathConstants.eulergamma * beta
+        return sum(x -> logpdf(Gumbel(mu, beta), x), obs)
+    end
 
     for θ in ([8.0, 2.0], [-3.0, 0.5], [100.0, 40.0])
         @test solved(θ) ≈ exact(θ)

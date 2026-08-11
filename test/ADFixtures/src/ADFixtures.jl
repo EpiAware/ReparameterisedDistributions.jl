@@ -17,9 +17,9 @@ using ADTypes: AutoForwardDiff, AutoReverseDiff, AutoMooncake,
 using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using Distributions: Beta, Exponential, Frechet, Gamma, InverseGaussian,
-                     LogNormal, NegativeBinomial, Normal, Pareto, Poisson,
-                     SkewNormal, Weibull, logpdf, cdf
+using Distributions: Beta, Exponential, Frechet, Gamma, Gumbel,
+                     InverseGaussian, LogNormal, NegativeBinomial, Pareto,
+                     Poisson, SkewNormal, Weibull, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -166,12 +166,13 @@ function _frechet_meansd_loglik(θ, obs)
     return sum(x -> logpdf(d, x), obs)
 end
 
-# `Normal` is the same solve with an unconstrained location, and it is the
-# scenario with an ORACLE: the solved native parameters are the moments
-# themselves, so a gradient that disagrees with `Normal(θ[1], θ[2])`'s own
-# is wrong rather than merely different.
-function _normal_meansd_loglik(θ, obs)
-    d = reparameterise(Normal; mean = θ[1], sd = θ[2], check_args = false)
+# The same solve with an unconstrained location. `Gumbel`, not one of the
+# location-scale families whose mean and standard deviation invert exactly
+# elsewhere (`Normal`, `Laplace`, `Logistic`, `Uniform`, `Cauchy`), which
+# would make this a scenario about that algebra rather than about the
+# vector solve.
+function _gumbel_meansd_loglik(θ, obs)
+    d = reparameterise(Gumbel; mean = θ[1], sd = θ[2], check_args = false)
     return sum(x -> logpdf(d, x), obs)
 end
 
@@ -239,8 +240,8 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
             _pareto_meansd_loglik, [8.0, 3.0], reals),
         ("Frechet(mean, sd) loglik (generic fallback)",
             _frechet_meansd_loglik, [8.0, 3.0], reals),
-        ("Normal(mean, sd) loglik (generic fallback)",
-            _normal_meansd_loglik, [8.0, 3.0], reals),
+        ("Gumbel(mean, sd) loglik (generic fallback)",
+            _gumbel_meansd_loglik, [8.0, 3.0], reals),
         ("Poisson(mean) loglik (generic fallback)", _poisson_mean_loglik,
             [10.0], counts))
 
@@ -308,10 +309,10 @@ broken_scenario_names() = String[]
 #
 # The two Enzyme entries below are therefore quarantined rather than
 # fixed here, and the generic fallback stays covered on those backends by
-# the Normal and Poisson scenarios, whose moments reach no `gamma`. The
-# registered Weibull scenario is unaffected because its own moment
-# equation is written in `loggamma`, which Enzyme does differentiate
-# correctly.
+# the Gumbel, Pareto and Poisson scenarios, whose moments reach no
+# `gamma`. The registered Weibull scenario is unaffected because its own
+# moment equation is written in `loggamma`, which Enzyme does
+# differentiate correctly.
 "Per-backend broken scenario names (`Dict{String, Set{String}}`)."
 function backend_broken_scenarios()
     frechet = Set(["Frechet(mean, sd) loglik (generic fallback)"])
