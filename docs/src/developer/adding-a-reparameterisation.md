@@ -166,11 +166,40 @@ ReparameterisedDistributions.native_domains(::Type{Levy}) = (:real, :positive)
 
 The tuple's length is also the native parameter count, so a family whose fields are not its parameters fixes both at once by registering here.
 
-What the fallback cannot do:
+### Jointly constrained parameters
 
-- a family whose parameters are *jointly* constrained, such as `Uniform`'s `a < b`, is not expressible as a per-parameter domain, and the solve can land on the mirrored, invalid pair. Construction rejects it, and `check_args = false` gives a NaN rather than a plausible answer, but such a family wants a closed form.
+`native_domains` says what each parameter may be on its own.
+It cannot say how two of them must relate, and some families are defined by exactly such a relation.
+
+`Uniform(a, b)` needs `a < b`, and its mean and variance are symmetric in the two: `(a + b) / 2` and `(b - a)^2 / 12` are unchanged by swapping them.
+The moment equations therefore have two roots, one of them ordered and one not, and the solve can converge on either.
+
+```@example adding
+reparameterise(Uniform; mean = 3.0, sd = 1.0)
+```
+
+```julia
+reparameterise(Uniform; mean = 1.0, sd = 0.02)  # DomainError: a must be less than b
+```
+
+Both requests describe a perfectly good `Uniform`.
+The first is found; the second converges on the mirrored pair, which the family's own constructor then rejects at construction.
+Under `check_args = false` it is a NaN density rather than a plausible wrong answer, but neither is what a caller wanted.
+
+This generalises to any family whose parameters are ordered or otherwise mutually constrained, and to any family whose moments are symmetric under a relabelling of its parameters.
+A two-line closed form is the answer for those:
+
+```julia
+ReparameterisedDistributions.to_native(::Type{Uniform}, ::Val{(:mean, :sd)}, vals) =
+    Uniform(vals[1] - sqrt(3 * vals[2]^2), vals[1] + sqrt(3 * vals[2]^2);
+        check_args = false)
+```
+
+### Other limits
+
 - a family with no `mean` or no `var` implemented in Distributions.jl, or one whose constructor will not take a float (`Erlang`'s integer shape), raises from the family's own code rather than answering `false`.
 - moments no member of the family has (a negative mean for a positive family, a `NegativeBinomial` less dispersed than a Poisson) are reported invalid, which is the honest answer rather than a failure.
+- an arity mismatch raises from [`valid_moments`](@ref) rather than answering `false`, the one place the generic path throws from a predicate. It is fixed by the wrapper's type parameters, so it cannot be reached by a sampler exploring values.
 
 ## Testing a registration
 
