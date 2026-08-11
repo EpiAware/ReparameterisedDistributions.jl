@@ -246,6 +246,10 @@ end
 The suite goes through the public surface only, so it holds your registration to exactly the contract this package holds its own to.
 It is not a substitute for testing your conversion's algebra against values worked by hand, which is what catches a formula that is self-consistent but wrong.
 
+A registration made inside a test is a method on a shared table, and tests in one session share that table however they are grouped or ordered.
+A family registered as a fixture in one test is therefore not neutral ground in another: a later test expecting that family to reach the standard-moment fallback will find the registration instead.
+Pick a family nothing else in the suite touches.
+
 ## Contributing a family to this package
 
 The same two methods, plus what a shipped family owes its users.
