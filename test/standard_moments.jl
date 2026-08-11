@@ -405,6 +405,43 @@ end
     @test_throws ArgumentError RD._linear_solve(jac, (1.0, 1.0, 1.0))
 end
 
+@testitem "solve_moments accepts a seed of mixed element types" begin
+    using Distributions
+    import ReparameterisedDistributions as RD
+    using ReparameterisedDistributions: solve_moments
+
+    # A seed builder legitimately mixes types: an unconstrained coordinate
+    # keeps the caller's own value while a log-scale one comes back from
+    # `log`. Under ReverseDiff those are concretely different `TrackedReal`
+    # types, which no homogeneous `NTuple` signature matches, so the driver
+    # promotes before iterating. `Float64` beside `Float32` is the same
+    # shape with nothing tracked.
+    @test_throws MethodError RD._newton_solve(z -> (z[1] - 1.0, z[2] - 1.0),
+        (0.0, 0.0f0))
+
+    residual = (z, vals) -> (exp(z[1]) - vals[1], exp(z[2]) - vals[2])
+    mixed = pvals -> ((zero(pvals[1]), 0.0f0),)
+    z = solve_moments(Gamma, Val((:a, :b)), residual, mixed, (2.0, 5.0))
+    @test z[1]≈log(2.0) rtol=1e-12
+    @test z[2]≈log(5.0) rtol=1e-12
+end
+
+@testitem "the guard rejects a solve that leaves the family's domain" begin
+    using Distributions
+    import ReparameterisedDistributions as RD
+
+    # `_in_domain` is what stands between a solved value and the family's
+    # own constructor, the same duty a registered predicate does for its
+    # derived parameters.
+    @test RD._in_domain(:positive, 2.0)
+    @test !RD._in_domain(:positive, 0.0)
+    @test !RD._in_domain(:positive, Inf)
+    @test RD._in_domain(:real, -3.0)
+    @test !RD._in_domain(:real, NaN)
+    @test RD._in_domain(:unit, 0.4)
+    @test !RD._in_domain(:unit, 1.0)
+end
+
 # --- Automatic differentiation --------------------------------------------
 
 @testitem "the fallback's gradient matches an exact closed form" begin
