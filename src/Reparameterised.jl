@@ -208,6 +208,16 @@ end
 # A name is a `Symbol` for a moment and a probability for an elicited
 # quantile, so the order is over a heterogeneous tuple: moments first,
 # alphabetically, then quantiles by ascending probability.
+#
+# This must stay CLOSED — these two methods and no others. `_canonical` is
+# generated and calls it from the generator, so it consults the method table
+# rather than merely emitting calls the way `_rows` (src/quantiles.jl) does,
+# and a generator's result is cached per signature and never invalidated by
+# a method added later. Two methods over a closed set of internal types make
+# that safe: nothing downstream can introduce a name that is neither, or
+# reorder the two. Making this extensible would give `_canonical` exactly
+# the staleness `_convertible` was rewritten to avoid, so it would have to
+# stop being generated first.
 _name_order(n::Symbol) = (0, string(n), 0.0)
 _name_order(n::Real) = (1, "", Float64(n))
 
