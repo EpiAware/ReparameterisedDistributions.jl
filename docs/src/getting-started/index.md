@@ -77,6 +77,30 @@ Its gradient stays exact under automatic differentiation.
 
 A family is registered with two methods, documented in [Adding a reparameterisation](@ref adding-a-reparameterisation), with the reference in [Public API](@ref public-api).
 
+## Any other family, by its standard moments
+
+The table above is the list of *exact* conversions, not the list of families that work.
+`mean` with `sd`, `mean` with `var`, and `mean` on its own are answered for any family, by solving the family's own moment equations for its native parameters when no closed form is registered.
+
+```@example getting-started
+d = reparameterise(Frechet; mean = 8.0, sd = 3.0)
+
+(mean(d), std(d), params(native(d)))
+```
+
+The result is an ordinary wrapper: it evaluates, samples and differentiates as the rest do, and its gradient is exact rather than an approximation of one.
+It is slower, because each density evaluation solves — about 5 microseconds against 17 nanoseconds for a registered closed form — so a family you use heavily is worth registering.
+
+One moment per native parameter is required, and a request the family has no member for is reported invalid in the usual way.
+
+```@example getting-started
+reparameterise(NegativeBinomial; mean = 10.0, sd = 2.0, check_args = false) |>
+    d -> logpdf(d, 3)
+```
+
+A `NegativeBinomial` is more dispersed than a Poisson, so a standard deviation of 2.0 around a mean of 10.0 describes no member of the family.
+A family with a location, a probability, or a parameter count its fields do not give needs one line to say so — see [the standard moments](@ref standard-moments).
+
 ## Rescaling a moment
 
 `rescale(d, factor)` scales one of `d`'s registered moments by `factor`,

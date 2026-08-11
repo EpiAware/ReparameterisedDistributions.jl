@@ -11,6 +11,9 @@ There is no registry to append to, no trait to opt into and no macro to call.
 using ReparameterisedDistributions, Distributions
 ```
 
+Registering nothing at all is also an option: `mean` with `sd`, `mean` with `var`, and `mean` on its own are solved numerically for any family, as [the standard moments](@ref standard-moments) below describes.
+Register the two methods when you know the algebra, or when the solve is too slow or too fragile for what you are doing.
+
 ## The two hooks
 
 | Hook | Signature | Returns | Runs |
@@ -42,6 +45,7 @@ It must cover jointly unattainable combinations: a `Beta`'s variance cannot exce
 For a numerically converted family, it must state the window the root-find can actually solve.
 Return `Bool`.
 The three-argument fallback returns `true`, so register both methods together.
+Under the standard moments the fallback is not that unconditional `true` but the numeric predicate described [below](@ref standard-moments), so a `to_native` registered there without a matching `valid_moments` inherits a predicate that answers for the generic solve rather than for your conversion.
 
 ## What `to_native` must guarantee
 
@@ -122,6 +126,51 @@ The root-find runs on the parameters stripped to their primal type, and the exac
 `valid_moments` carries an extra duty here: it must also exclude requests the bracket cannot answer, so the solver is never reached with them.
 
 `Weibull` by mean and standard deviation is the worked example in the package itself (`src/families.jl`), and the solver backend is supplied by a package extension, so a numeric family needs `Roots` loaded.
+
+## [The standard moments, for a family that registers nothing](@id standard-moments)
+
+`(:mean, :sd)`, `(:mean, :var)` and `(:mean,)` do not need a registration at all.
+When no closed form is registered for the pair, they are answered by solving the family's own moment equations for its native parameters.
+
+```@example adding
+d = reparameterise(Frechet; mean = 8.0, sd = 3.0)
+
+(mean(d), std(d), params(native(d)))
+```
+
+A registered conversion is strictly more specific than the generic one, so every closed form in `src/families.jl` still wins by ordinary dispatch and nothing that had exact algebra starts root-finding.
+
+Three things follow from a family being solved rather than converted.
+
+**One moment per native parameter.**
+The number of moments has to match the number of native parameters, and any other number raises rather than fitting some of them and leaving the rest wherever the solve started.
+`SkewNormal` has three native parameters, so it cannot be pinned down by a mean and a standard deviation:
+
+```julia
+reparameterise(SkewNormal; mean = 1.0, sd = 2.0)  # ArgumentError
+```
+
+**The guard runs the solve.**
+[`valid_moments`](@ref) answers by running the same iteration [`to_native`](@ref) runs and reporting whether it converged, which is what keeps a request outside the solvable region at `logpdf == -Inf` under `check_args = false` rather than raising mid-gradient.
+It costs the solve twice on every call, so a family used heavily in a sampler is worth registering a closed form for.
+Measured on `Frechet`: about 5 microseconds per density evaluation, against 17 nanoseconds for a registered closed form.
+
+**The coordinates come from [`native_domains`](@ref).**
+The solve runs in unconstrained coordinates, and that hook says which transform each native parameter gets — `:positive` for `exp`, `:real` for the parameter itself, `:unit` for `logistic`.
+The default reports every native parameter as `:positive` and takes the count from the family's own fields, which is right for a shape-and-scale family and wrong for anything with a location or a probability.
+One line fixes a family the default misses:
+
+```julia
+ReparameterisedDistributions.native_domains(::Type{Levy}) = (:real, :positive)
+```
+
+The tuple's length is also the native parameter count, so a family whose fields are not its parameters fixes both at once by registering here.
+
+What the fallback cannot do:
+
+- a family whose parameters are *jointly* constrained, such as `Uniform`'s `a < b`, is not expressible as a per-parameter domain, and the solve can land on the mirrored, invalid pair. Construction rejects it, and `check_args = false` gives a NaN rather than a plausible answer, but such a family wants a closed form.
+- a family with no `mean` or no `var` implemented in Distributions.jl, or one whose constructor will not take a float (`Erlang`'s integer shape), raises from the family's own code rather than answering `false`.
+- moments no member of the family has (a negative mean for a positive family, a `NegativeBinomial` less dispersed than a Poisson) are reported invalid, which is the honest answer rather than a failure.
 
 ## Testing a registration
 

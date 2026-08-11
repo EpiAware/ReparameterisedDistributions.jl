@@ -194,7 +194,11 @@ end
 # 4e-11 in `Float64`. That error does not reach the gradient: the second
 # correction step in `solve_moments` cancels it to second order, measured
 # against `Gamma`'s own closed form as agreement to 3e-16.
-function _fd_jacobian(f::F, z::NTuple{N, T}) where {F, N, T}
+# `T` comes from `eltype` rather than from an `NTuple{N, T}` signature
+# throughout the iteration: an empty tuple leaves `T` unbound, which is a
+# method Aqua rejects even though no system here has zero unknowns.
+function _fd_jacobian(f::F, z::NTuple{N, <:Real}) where {F, N}
+    T = eltype(z)
     h = cbrt(eps(T))
     return ntuple(Val(N)) do j
         hj = h * max(one(T), abs(z[j]))
@@ -245,7 +249,8 @@ _merit(r) = sum(abs2, r)
 # crawl rather than fail the line search. Measured on
 # `reparameterise(Frechet; mean = -8.0, sd = 3.0)`, which no Frechet has:
 # 112us against 5.3us for a request that solves.
-function _newton_solve(f::F, z0::NTuple{N, T}) where {F, N, T}
+function _newton_solve(f::F, z0::NTuple{N, <:Real}) where {F, N}
+    T = eltype(z0)
     z = z0
     jac = _fd_jacobian(f, z)
     for _ in 1:_NEWTON_ITERATIONS
@@ -275,7 +280,8 @@ end
 # coordinate's own size: a step of 8 is generous in a log coordinate and
 # nowhere near enough in an unconstrained location whose scale is the
 # data's.
-function _trust_scale(z::NTuple{N, T}, δ) where {N, T}
+function _trust_scale(z::NTuple{N, <:Real}, δ) where {N}
+    T = eltype(z)
     s = one(T)
     for i in 1:N
         limit = T(_NEWTON_STEP_CAP) * max(one(T), abs(z[i]))
@@ -284,7 +290,8 @@ function _trust_scale(z::NTuple{N, T}, δ) where {N, T}
     return s
 end
 
-function _line_search(f::F, z::NTuple{N, T}, δ, m0) where {F, N, T}
+function _line_search(f::F, z::NTuple{N, <:Real}, δ, m0) where {F, N}
+    T = eltype(z)
     λ = one(T)
     while λ > _LINE_SEARCH_MIN
         zt = _step(z, λ, δ)

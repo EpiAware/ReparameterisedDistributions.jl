@@ -23,6 +23,8 @@
   can be put on the mean directly.
 - The wrapper is an ordinary `Distribution` and stays differentiable, so the
   moments can be sampled directly inside a model.
+- A family whose moments have no closed form is solved for numerically, so the
+  choice of family is not limited to the ones whose algebra is registered.
 
 ## Getting started
 
