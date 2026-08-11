@@ -24,9 +24,9 @@ end
     # parameters (`InverseGamma` holds a `Gamma`).
     cases = ((Frechet, 8.0, 3.0), (Frechet, 8.0, 30.0), (Pareto, 8.0, 3.0),
         (InverseGamma, 8.0, 3.0), (BetaPrime, 2.0, 3.0),
-        (Kumaraswamy, 0.3, 0.1), (Uniform, 3.0, 1.0),
+        (BetaPrime, 1.0, 0.05), (Kumaraswamy, 0.3, 0.1),
         (Normal, -3.0, 2.0), (Normal, 0.0, 1.0), (Laplace, 3.0, 2.0),
-        (Logistic, 3.0, 2.0), (Gumbel, 3.0, 2.0))
+        (Logistic, 3.0, 2.0), (Gumbel, 3.0, 2.0), (Gumbel, 500.0, 2500.0))
 
     for (D, m, s) in cases
         d = reparameterise(D; mean = m, sd = s)
@@ -39,6 +39,7 @@ end
     using Distributions
 
     for m in (0.5, 1.0, 8.0, 1.0e4), cv in (0.05, 0.2, 1.0, 3.0)
+
         d = reparameterise(Frechet; mean = m, sd = m * cv)
         @test mean(d)≈m rtol=1e-8
         @test std(d)≈m * cv rtol=1e-8
@@ -344,8 +345,7 @@ end
     # `Levy(mu, sigma)` has an unconstrained location, so the default
     # (every parameter positive) cannot reach a negative one. This is the
     # one-line registration a family needs, and nothing else.
-    ReparameterisedDistributions.native_domains(::Type{Levy}) =
-        (:real, :positive)
+    ReparameterisedDistributions.native_domains(::Type{Levy}) = (:real, :positive)
 
     @test native_domains(Levy) == (:real, :positive)
     # A Levy has neither a finite mean nor a finite variance, so the solve
@@ -414,7 +414,8 @@ end
     # solve — and its answer is known exactly, which makes the native
     # distribution an oracle for both the value and the gradient.
     obs = [4.2, 7.1, 9.8, 12.4, 6.0]
-    solved(θ) = sum(x -> logpdf(
+    solved(θ) = sum(
+        x -> logpdf(
             reparameterise(Normal; mean = θ[1], sd = θ[2],
                 check_args = false), x), obs)
     exact(θ) = sum(x -> logpdf(Normal(θ[1], θ[2]), x), obs)

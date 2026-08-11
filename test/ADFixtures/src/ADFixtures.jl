@@ -17,8 +17,9 @@ using ADTypes: AutoForwardDiff, AutoReverseDiff, AutoMooncake,
 using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
-using Distributions: Beta, Exponential, Gamma, InverseGaussian, LogNormal,
-                     NegativeBinomial, SkewNormal, Weibull, logpdf, cdf
+using Distributions: Beta, Exponential, Frechet, Gamma, InverseGaussian,
+                     LogNormal, NegativeBinomial, Normal, Pareto, Poisson,
+                     SkewNormal, Weibull, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -140,6 +141,47 @@ function _weibull_meansd_loglik(θ, obs)
     return sum(x -> logpdf(d, x), obs)
 end
 
+# The GENERIC standard-moment fallback (src/standard_moments.jl). None of
+# these four families registers a closed form, so each runs the vector
+# Newton and the implicit-function-theorem correction that follows it,
+# which is a different driver from the Weibull scenario's scalar
+# root-find and needs its own `inactive`/`@zero_derivative` treatment to
+# survive Enzyme and Mooncake.
+#
+# `Pareto` is the two-unknown solve in its plainest form: both native
+# parameters positive, so both are solved in log coordinates, and its
+# moments are rational (`αθ/(α-1)`) rather than gamma-function ones. That
+# last part is what makes it, not `Frechet` below, the scenario that
+# proves the vector solve on all six backends.
+function _pareto_meansd_loglik(θ, obs)
+    d = reparameterise(Pareto; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The same geometry with gamma-function moments, which is what Enzyme
+# gets wrong (#110). Kept, and marked broken on the two Enzyme backends
+# below, so an upstream fix shows up as an unexpected pass.
+function _frechet_meansd_loglik(θ, obs)
+    d = reparameterise(Frechet; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# `Normal` is the same solve with an unconstrained location, and it is the
+# scenario with an ORACLE: the solved native parameters are the moments
+# themselves, so a gradient that disagrees with `Normal(θ[1], θ[2])`'s own
+# is wrong rather than merely different.
+function _normal_meansd_loglik(θ, obs)
+    d = reparameterise(Normal; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The one-unknown generic solve, on a discrete family: a length-1 system
+# takes a different `_linear_solve` method from the two-unknown one.
+function _poisson_mean_loglik(θ, counts)
+    d = reparameterise(Poisson; mean = θ[1], check_args = false)
+    return sum(k -> logpdf(d, k), counts)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -192,7 +234,15 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         # locally constant. Not the CV-edge cases above, which are valid
         # but numerically fragile, a different failure mode.
         ("Gamma(mean, sd) loglik at invalid moments", _gamma_meansd_loglik,
-            [-8.0, 3.0], reals))
+            [-8.0, 3.0], reals),
+        ("Pareto(mean, sd) loglik (generic fallback)",
+            _pareto_meansd_loglik, [8.0, 3.0], reals),
+        ("Frechet(mean, sd) loglik (generic fallback)",
+            _frechet_meansd_loglik, [8.0, 3.0], reals),
+        ("Normal(mean, sd) loglik (generic fallback)",
+            _normal_meansd_loglik, [8.0, 3.0], reals),
+        ("Poisson(mean) loglik (generic fallback)", _poisson_mean_loglik,
+            [10.0], counts))
 
     for (name, f, θ, contexts) in cases
         push!(out,

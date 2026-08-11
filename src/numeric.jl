@@ -239,18 +239,15 @@ _merit(r) = sum(abs2, r)
 # convergence test: the merit has to fall on every accepted step, while
 # convergence is a statement about each equation separately.
 #
-# The stall count is what stops a request with no solution at all from
-# costing the whole iteration budget on every seed: the Armijo condition
-# accepts an arbitrarily small decrease, so an iterate walking off towards
-# a boundary it never reaches can crawl for the full hundred iterations
-# without ever failing the line search. Measured on
+# The iteration budget is what bounds a request with no solution at all,
+# because the Armijo condition accepts an arbitrarily small decrease and
+# an iterate walking towards a boundary it never reaches can therefore
+# crawl rather than fail the line search. Measured on
 # `reparameterise(Frechet; mean = -8.0, sd = 3.0)`, which no Frechet has:
-# 280us before, 20us after, against 5us for a request that solves.
+# 112us against 5.3us for a request that solves.
 function _newton_solve(f::F, z0::NTuple{N, T}) where {F, N, T}
     z = z0
     jac = _fd_jacobian(f, z)
-    previous = T(Inf)
-    stalls = 0
     for _ in 1:_NEWTON_ITERATIONS
         r = f(z)
         all(isfinite, r) || return (z, jac, false)
@@ -259,20 +256,16 @@ function _newton_solve(f::F, z0::NTuple{N, T}) where {F, N, T}
         # exact only from the Jacobian at the root.
         maximum(abs, r) <= _newton_tol(T) &&
             return (z, _fd_jacobian(f, z), true)
-        merit = _merit(r)
-        stalls = merit > (1 - T(_MIN_PROGRESS)) * previous ? stalls + 1 : 0
-        stalls >= _MAX_STALLS && break
-        previous = merit
         jac = _fd_jacobian(f, z)
         all(c -> all(isfinite, c), jac) || return (z, jac, false)
         full = _linear_solve(jac, r)
         all(isfinite, full) || return (z, jac, false)
         z, moved = _line_search(f, z, _scaled(full, -_trust_scale(z, full)),
-            merit)
+            _merit(r))
         moved || break
     end
-    jac = _fd_jacobian(f, z)
-    return (z, jac, maximum(abs, f(z)) <= _newton_tol(T))
+    return (z, _fd_jacobian(f, z),
+        maximum(abs, f(z)) <= _newton_tol(T))
 end
 
 # How much of a Newton step may be taken before the line search starts
@@ -307,11 +300,13 @@ function _line_search(f::F, z::NTuple{N, T}, δ, m0) where {F, N, T}
     return (z, false)
 end
 
-const _NEWTON_ITERATIONS = 100
+# Forty is measured headroom rather than a round number: over a sweep of
+# 259 solvable (family, mean, coefficient of variation) requests, a budget
+# of twelve loses one of them and forty loses none, and no request that
+# solves at all needs more than about ten iterations.
+const _NEWTON_ITERATIONS = 40
 const _NEWTON_STEP_CAP = 8.0
 const _LINE_SEARCH_MIN = 1.0e-8
-const _MIN_PROGRESS = 1.0e-4
-const _MAX_STALLS = 3
 
 # Tighter than `_moment_atol`, which is what the corrected root is finally
 # held to: the primal iterate is polished twice more before that check.
