@@ -91,6 +91,13 @@ _poslog(x) = x > 0 ? log(x) : oftype(float(x), NaN)
 
 # One moment per native parameter, decided from the names and the family
 # alone, so the branch folds away and the check costs nothing per call.
+#
+# This is the one place the generic path raises from inside
+# `valid_moments`, whose own docstring says a predicate must not throw.
+# The exception is deliberate and cannot be reached by a sampler: the
+# condition is fixed by the wrapper's type parameters, so it is the same
+# on every call, and answering `false` instead would turn a structural
+# mistake into a silent `-Inf`.
 function _check_moment_arity(::Type{D}, ::Val{names}) where {D, names}
     n = length(native_domains(D))
     length(names) == n && return nothing
@@ -173,10 +180,28 @@ end
 function _moments_solvable(::Type{D}, v::Val{names}, vals) where {D, names}
     domains = native_domains(D)
     pvals = map(_primal, vals)
-    _, _, converged = _solve_moment_system(
+    z, _, converged = _solve_moment_system(
         z -> _standard_residual(D, v, domains, z, pvals),
         _standard_seeds(v, domains, pvals))
-    return converged
+    converged || return false
+    return all(map(_in_domain, domains, _native_values(domains, z)))
+end
+
+# The solved parameters have to survive the transform before the family's
+# constructor sees them. A converged solve almost always guarantees that,
+# since a native parameter that overflowed would have taken the residual
+# to NaN with it, but the transform is applied once more in the caller's
+# own type after the correction, and a value at the very edge can round
+# out of the family's domain on that last step. Registered predicates
+# guard their own derived parameters the same way (see `valid_moments`
+# for `Gamma`, which restates its own `scale` and `shape`), so an
+# unsolvable request gives `-Inf` rather than a degenerate distribution
+# and a NaN density.
+function _in_domain(domain::Symbol, θ)
+    isfinite(θ) || return false
+    domain === :real && return true
+    domain === :unit && return 0 < θ < 1
+    return θ > 0
 end
 
 function _solve_standard(::Type{D}, v::Val{names}, vals) where {D, names}
