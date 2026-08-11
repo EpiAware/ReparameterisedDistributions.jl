@@ -61,8 +61,8 @@ an under- or over-determined request names both counts.
 reparameterise(LogNormal; median = 4.0, quantiles = (0.95 => 12.0,))
 ```
 
-A pair of values that falls with the probability describes no distribution at
-all, so it is refused in the same way an unattainable moment is.
+Values that fall as the probability rises describe no distribution at all, so
+such a pair is refused in the same way an unattainable moment is.
 
 ```@example getting-started
 bad = reparameterise(Normal; quantiles = (0.25 => 3.0, 0.75 => 1.0),

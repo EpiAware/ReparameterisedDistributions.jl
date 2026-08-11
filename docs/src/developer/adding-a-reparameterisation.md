@@ -65,8 +65,9 @@ Moment names come before quantile probabilities, and probabilities themselves as
 
 ## A worked example
 
-This package registers `Laplace` by quantile constraints and by nothing else, so a mean and a standard deviation are free to register here.
-A `Laplace(mu, theta)` has mean `mu` and variance `2 * theta^2`, so the location is native and `theta = sd / sqrt(2)`.
+`Gumbel` is not registered by this package, by moments or by quantiles, so a mean and a standard deviation are free to register here.
+A `Gumbel(mu, theta)` has mean `mu + theta * γ`, for the Euler–Mascheroni constant `γ`, and variance `theta^2 * π^2 / 6`.
+Neither native parameter is a moment outright, so both are derived: `theta = sd * sqrt(6) / π` and `mu = mean - theta * γ`.
 The location is unconstrained, so only the scale needs guarding.
 
 The predicate first:
@@ -74,7 +75,7 @@ The predicate first:
 ```@example adding
 import ReparameterisedDistributions: to_native, valid_moments
 
-function valid_moments(::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+function valid_moments(::Type{Gumbel}, ::Val{(:mean, :sd)}, vals)
     _, sd = vals
     return sd > 0
 end
@@ -83,16 +84,18 @@ end
 Then the conversion, which assumes the predicate has passed:
 
 ```@example adding
-function to_native(::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+function to_native(::Type{Gumbel}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    return Laplace(mean, sd / sqrt(oftype(sd, 2)); check_args = false)
+    theta = sd * sqrt(oftype(sd, 6)) / oftype(sd, π)
+    return Gumbel(mean - theta * oftype(sd, Base.MathConstants.eulergamma),
+        theta; check_args = false)
 end
 ```
 
-`oftype(sd, 2)` rather than a bare `2` keeps a `Float32`, or a dual number under automatic differentiation, from being widened by the division.
+`oftype(sd, 6)` rather than a bare `6` keeps a `Float32`, or a dual number under automatic differentiation, from being widened by the arithmetic.
 
 ```@example adding
-d = reparameterise(Laplace; mean = 3.0, sd = 2.0)
+d = reparameterise(Gumbel; mean = 3.0, sd = 2.0)
 ```
 
 ```@example adding
@@ -102,7 +105,7 @@ d = reparameterise(Laplace; mean = 3.0, sd = 2.0)
 An invalid scale is rejected at construction, and gives a zero density without the construction check rather than raising inside a gradient:
 
 ```@example adding
-bad = reparameterise(Laplace; mean = 3.0, sd = -2.0, check_args = false)
+bad = reparameterise(Gumbel; mean = 3.0, sd = -2.0, check_args = false)
 
 logpdf(bad, 2.5)
 ```
@@ -134,7 +137,7 @@ It is public but not exported, and `Test` supplies it through a package extensio
 using Test
 using ReparameterisedDistributions: test_reparameterisation
 
-test_reparameterisation(Laplace, (:mean, :sd), (3.0, 2.0);
+test_reparameterisation(Gumbel, (:mean, :sd), (3.0, 2.0);
     invalid = ((3.0, -2.0), (3.0, 0.0)))
 ```
 
@@ -162,7 +165,7 @@ using Test, Distributions, ReparameterisedDistributions
 using ReparameterisedDistributions: test_reparameterisation
 
 @testset "MyPackage reparameterisations" begin
-    test_reparameterisation(Laplace, (:mean, :sd), (3.0, 2.0);
+    test_reparameterisation(Gumbel, (:mean, :sd), (3.0, 2.0);
         invalid = ((3.0, -2.0), (3.0, 0.0)))
 end
 ```

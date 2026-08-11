@@ -397,9 +397,13 @@ end
     # The moment names each inversion can express. A Cauchy has neither
     # moment and a LogNormal's are linear in neither native parameter, so
     # both offer the median alone.
-    for D in Any[Cauchy, LogNormal, Exponential]
+    for D in Any[Cauchy, LogNormal]
         @test RD._moment_names(D) == (:median,)
     end
+    # An Exponential's standard deviation is its scale, so it is a row here
+    # too; its mean is the whole constraint set and is registered
+    # concretely instead.
+    @test RD._moment_names(Any[Exponential][1]) == (:median, :sd)
     for D in Any[Normal, Logistic, Uniform, Laplace]
         @test RD._moment_names(D) == (:mean, :median, :sd)
     end
@@ -502,4 +506,90 @@ end
         @test var(d) ≈ var(nd)
         @test rand(Xoshiro(1), d) == rand(Xoshiro(1), nd)
     end
+end
+
+@testitem "standard moments: Exponential by its standard deviation" begin
+    using Distributions
+
+    # An Exponential's standard deviation is its scale, so one constraint
+    # is exactly the right number and the request is determined.
+    d = reparameterise(Exponential; sd = 2.0)
+    @test native(d) ≈ Exponential(2.0)
+    @test std(d)≈2.0 rtol=1e-12
+    @test mean(d)≈2.0 rtol=1e-12
+    @test params(d) == (2.0,)
+
+    @test_throws DomainError reparameterise(Exponential; sd = -1.0)
+end
+
+@testitem "quantiles: constraints that repeat each other are refused" begin
+    using Distributions
+
+    # The coefficients of a row depend only on its NAME, so two constraints
+    # saying the same thing is a fact about the request rather than about
+    # its values: a Normal is symmetric about its location, so its mean and
+    # its median are one row written twice and no numbers can rescue the
+    # pair. It is the same defect as a repeated probability, so it gets the
+    # same structural error rather than a `DomainError` about the values.
+    @test_throws ArgumentError reparameterise(Normal; mean = 5.0,
+        median = 5.0)
+    @test_throws ArgumentError reparameterise(Normal; median = 5.0,
+        quantiles = (0.5 => 5.0,))
+    @test_throws ArgumentError reparameterise(Uniform; mean = 5.0,
+        median = 5.0)
+
+    for f in (() -> reparameterise(Normal; mean = 5.0, median = 5.0),
+        () -> reparameterise(Normal; median = 5.0,
+        quantiles = (0.5 => 5.0,)))
+        try
+            f()
+        catch e
+            msg = sprint(showerror, e)
+            @test occursin("not independent", msg)
+            @test occursin("Normal", msg)
+        end
+    end
+
+    # A quantile at one half is the median, so it collides the same way,
+    # while two distinct probabilities do not.
+    @test reparameterise(Normal; quantiles = (0.25 => 1.0, 0.75 => 3.0)) isa
+          Distribution
+
+    # The mean is NOT the median of a family that is not symmetric about
+    # its location, so the two are independent there and the pair is a
+    # different refusal — one this package leaves to the numeric solve.
+    @test_throws ArgumentError reparameterise(LogNormal; mean = 5.0,
+        quantiles = (0.95 => 9.0,))
+end
+
+@testitem "quantiles: a later registration is not answered from a stale cache" begin
+    using Distributions
+    import ReparameterisedDistributions as RD
+
+    # `_convertible` reads `_constraint_arity`, `_moment_names` and the
+    # constraint rows. Were it a generated function its answer would be
+    # cached per signature and never invalidated, so a family registered
+    # AFTER the first call would keep the stale `false` for the rest of the
+    # session, with no error to say so.
+    #
+    # A local type rather than a real family: this fixes a dispatch
+    # property, and says nothing about anyone's distribution.
+    struct StaleProbe <: ContinuousUnivariateDistribution end
+
+    # Nothing is registered for it, so it answers `false` — and the answer
+    # is cached at this point under a generated implementation.
+    @test RD._convertible(StaleProbe, Val((:median, 0.75))) == false
+
+    # Register it, exactly as the location-scale families are registered.
+    RD._constraint_arity(::Type{StaleProbe}) = 2
+    RD._moment_names(::Type{StaleProbe}) = (:median,)
+    RD._std_quantile(::Type{StaleProbe}, p) = log(p / (1 - p))
+
+    # The answer has to follow the method table, which is what a cached
+    # generator would not do.
+    @test RD._convertible(StaleProbe, Val((:median, 0.75))) == true
+
+    # And the arity registered is the one enforced, rather than one baked
+    # in at the first call.
+    @test RD._convertible(StaleProbe, Val((:median,))) == false
 end

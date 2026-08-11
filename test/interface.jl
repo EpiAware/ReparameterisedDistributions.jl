@@ -76,26 +76,30 @@ end
 
     # A registration made exactly as a downstream package makes one: add a
     # method to each of the two hooks, then check the result with the same
-    # interface suite this package uses on its own families. This package
-    # registers `Laplace` by quantile constraints and by nothing else, so
-    # the pair below shadows no shipped method.
+    # interface suite this package uses on its own families. `Gumbel` is a
+    # Distributions.jl family this package registers by nothing at all, so
+    # the pair below shadows no shipped method. `Laplace` would not do:
+    # it is in `_LinearMoments`, so this package already registers it by
+    # `(:mean, :sd)` and the example would be shadowing rather than adding.
     #
-    # `Laplace(mu, theta)` has mean `mu` and variance `2 * theta^2`, so the
-    # location is native and `theta = sd / sqrt(2)`. The location is
-    # unconstrained, so only the scale is guarded.
+    # `Gumbel(mu, theta)` has mean `mu + theta * eulergamma` and variance
+    # `theta^2 * pi^2 / 6`, so both native parameters are derived. The
+    # location is unconstrained, so only the scale is guarded.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :sd)}, vals)
         _, sd = vals
         return sd > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :sd)}, vals)
         m, sd = vals
-        return Laplace(m, sd / sqrt(oftype(sd, 2)); check_args = false)
+        theta = sd * sqrt(oftype(sd, 6)) / oftype(sd, pi)
+        return Gumbel(m - theta * oftype(sd, Base.MathConstants.eulergamma),
+            theta; check_args = false)
     end
 
-    test_reparameterisation(Laplace, (:mean, :sd), (3.0, 2.0);
+    test_reparameterisation(Gumbel, (:mean, :sd), (3.0, 2.0);
         invalid = ((3.0, -2.0), (3.0, 0.0)))
 end
 
@@ -164,24 +168,27 @@ end
         @test which(to_native, argtypes) === fallback
     end
 
-    # `Laplace(mean, var)` is not registered by this package either.
-    # `to_native` here is exactly the #86 shape: a branch that can return
-    # `nothing`, so its inferred return type is a `Union` even though this
-    # particular call (`var = 2.0 > 0`) never actually takes that branch.
+    # `Gumbel(mean, var)` is not registered by this package either — and
+    # `Laplace(mean, var)` no longer qualifies, since `_LinearMoments`
+    # covers it. `to_native` here is exactly the #86 shape: a branch that
+    # can return `nothing`, so its inferred return type is a `Union` even
+    # though this particular call (`var = 2.0 > 0`) never takes that branch.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :var)}, vals)
         _, v = vals
         return v > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :var)}, vals)
         m, v = vals
         v <= 0 && return nothing
-        return Laplace(m, sqrt(v / oftype(v, 2)); check_args = false)
+        theta = sqrt(v) * sqrt(oftype(v, 6)) / oftype(v, pi)
+        return Gumbel(m - theta * oftype(v, Base.MathConstants.eulergamma),
+            theta; check_args = false)
     end
 
-    let argtypes = (Type{Laplace}, Val{(:mean, :var)},
+    let argtypes = (Type{Gumbel}, Val{(:mean, :var)},
             Tuple{Float64, Float64})
         rt = only(Base.return_types(to_native, argtypes))
         @test Nothing <: rt

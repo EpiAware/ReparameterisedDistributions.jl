@@ -36,7 +36,8 @@ end
 # The moment names that inversion can express, alongside any probabilities.
 # An Exponential's mean is not among them: it is the family's only
 # parameter, so `(:mean,)` is a whole constraint set and is registered
-# concretely below rather than reached as a row.
+# concretely below rather than reached as a row. Its standard deviation is
+# that same scale, and is reached as a row like any other.
 function _moment_names(::Type)
     return ()
 end
@@ -47,7 +48,7 @@ function _moment_names(::Type{<:_LinearMoments})
     return (:mean, :median, :sd)
 end
 function _moment_names(::Type{Exponential})
-    return (:median,)
+    return (:median, :sd)
 end
 
 # --- The standard member ----------------------------------------------------
@@ -136,10 +137,22 @@ function _constraint_row(::Type{D}, ::Val{:sd}, v) where {D <: _LinearMoments}
     return (zero(v), oftype(v, _std_sd(D)), v)
 end
 
+# An `Exponential(theta)` has `sd = theta`, so its standard deviation is its
+# scale outright.
+function _constraint_row(::Type{Exponential}, ::Val{:sd}, v)
+    return (zero(v), one(v), v)
+end
+
 # Every constraint's row. Generated for the reason `_canonical` is: a moment
 # name becomes a `Val` and a probability a literal at compile time, so
 # nothing indexes the name tuple or compares a `Symbol` on the sampler's hot
 # path.
+#
+# The generator reads `names` and nothing else. It does not consult the
+# method table — the `_constraint_row` calls it emits are resolved by
+# ordinary dispatch afterwards — so a method added later is picked up
+# normally. That is the property `_convertible` below could not have, which
+# is why it is not generated.
 @generated function _rows(D::Type, ::Val{names}, vals) where {names}
     calls = [n isa Symbol ?
              :(_constraint_row(D, Val($(QuoteNode(n))), vals[$i])) :
@@ -152,20 +165,57 @@ end
 
 # Whether a constraint set is one this file can invert exactly: the family
 # has an inversion, the count matches it, every moment name is one that
-# inversion expresses, and every probability is a distinct point strictly
-# inside (0, 1). Generated, so the answer is a literal `Bool`: it depends on
-# nothing but the family and the names, and it is checked at every call site.
-@generated function _convertible(D::Type, ::Val{names}) where {names}
-    fam = D.parameters[1]
-    fam isa Type || return :(false)
-    arity = _constraint_arity(fam)
-    arity == length(names) || return :(false)
-    moments = _moment_names(fam)
-    probs = filter(!(n -> n isa Symbol), collect(names))
-    all(n -> n in moments, filter(n -> n isa Symbol, collect(names))) ||
-        return :(false)
-    all(p -> 0 < p < 1, probs) || return :(false)
-    return :($(allunique(probs)))
+# inversion expresses, every probability is a distinct point strictly inside
+# (0, 1), and the constraints are independent of each other.
+#
+# Deliberately NOT a generated function, though everything it reads is known
+# at compile time. A generator's result is cached per signature and is not
+# invalidated when a method is added afterwards, so a generated body that
+# called `_constraint_arity` or `_moment_names` would answer from whichever
+# methods existed the first time it ran and keep that answer for the rest of
+# the session. Written this way it is ordinary dispatch, and folds to a
+# constant just the same: `names` is a type parameter, so the recursion
+# below unrolls and the whole call collapses at compile time.
+function _convertible(::Type{D}, ::Val{names}) where {D, names}
+    arity = _constraint_arity(D)
+    arity === nothing && return false
+    length(names) == arity || return false
+    _check_names(D, names) || return false
+    return _independent(D, Val(names))
+end
+
+# Whether the constraints say independent things. Each row's COEFFICIENTS
+# depend only on the names, never on the values, so this is a structural
+# fact about the request: a mean and a median of a family symmetric about
+# its location are one row written twice, and no numbers put into them can
+# make the pair describe a distribution.
+function _independent(::Type{D}, ::Val{names}) where {D, names}
+    return _full_rank(_rows(D, Val(names), ntuple(_ -> 1.0, length(names))))
+end
+
+_full_rank(rows::Tuple{Any}) = !iszero(rows[1][2])
+
+function _full_rank(rows::Tuple{Any, Any})
+    (a1, b1, _), (a2, b2, _) = rows
+    return !iszero(a1 * b2 - a2 * b1)
+end
+
+# Recursion over the tuple rather than an index loop: each step is
+# concretely typed, so nothing indexes a heterogeneous tuple at run time.
+function _check_names(::Type{D}, names::Tuple) where {D}
+    rest = Base.tail(names)
+    _check_name(D, first(names), rest) || return false
+    return isempty(rest) || _check_names(D, rest)
+end
+
+function _check_name(::Type{D}, n::Symbol, rest) where {D}
+    return n in _moment_names(D)
+end
+
+# A probability has to be a point strictly inside (0, 1), and has to appear
+# once: two constraints at one probability say the same thing twice.
+function _check_name(::Type{D}, p::Real, rest) where {D}
+    return 0 < p < 1 && !any(q -> q isa Real && q == p, rest)
 end
 
 # The seam the generic numeric solve for constraint sets plugs into. A set
@@ -202,6 +252,10 @@ function _unconvertible_message(::Type{D}, names) where {D}
                "got $(probs)"
     elseif !allunique(probs)
         return "a quantile probability must appear once; got $(probs)"
+    elseif _check_names(D, names)
+        return "($(spec)) are not independent constraints on $(D): they " *
+               "pin the same combination of its parameters, so no values " *
+               "of them describe a member of the family"
     end
     return "no reparameterisation of $(D) by ($(spec)) is registered: the " *
            "exact inversion of $(D) from constraints expresses " *
@@ -279,9 +333,10 @@ end
 # --- The standard moments, registered concretely ----------------------------
 #
 # The methods above fix the FAMILY and leave the names free. The
-# standard-moment fallback (src/standard_moments.jl, #106) is the mirror
-# image: it fixes the names — `(:mean, :sd)`, `(:mean, :var)`, `(:mean,)` —
-# and leaves the family free. Neither is more specific than the other, so
+# standard-moment fallback is the mirror image: it fixes the names —
+# `(:mean, :sd)`, `(:mean, :var)`, `(:mean,)` — and leaves the family free.
+# It arrives with #106, as `src/standard_moments.jl`, so that path is a
+# FORWARD reference and is not in this tree yet. Neither is more specific than the other, so
 # every (one of these families, one of those name tuples) pair is
 # ambiguous unless something more specific than both is registered for it.
 #
@@ -337,8 +392,7 @@ end
 
 # An `Exponential(theta)` has `mean = theta`, so the mean is the scale.
 function to_native(::Type{Exponential}, ::Val{(:mean,)}, vals)
-    Exponential(
-        vals[1]; check_args = false)
+    return Exponential(vals[1]; check_args = false)
 end
 
 function valid_moments(::Type{Exponential}, ::Val{(:mean,)}, vals)
