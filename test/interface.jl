@@ -46,12 +46,24 @@
         (Exponential, (0.95,), (3.0,), ((-3.0,), (0.0,))),
         (LogNormal, (:median, 0.95), (4.0, 12.0), ((12.0, 4.0),)),
         (Normal, (:mean, 0.95), (8.0, 20.0), ((20.0, 8.0),)),
-        (Normal, (:sd, 0.95), (2.0, 20.0), ((-2.0, 20.0),))
+        (Normal, (:sd, 0.95), (2.0, 20.0), ((-2.0, 20.0),)),
+        # The standard moments, where a location and a scale are what they
+        # already are. Registered concretely so they stay unambiguous
+        # against the mirror generic in src/standard_moments.jl.
+        (Normal, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0), (5.0, 0.0))),
+        (Normal, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Logistic, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0),)),
+        (Logistic, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Laplace, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0),)),
+        (Laplace, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Uniform, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0),)),
+        (Uniform, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Exponential, (:mean,), (4.0,), ((-4.0,), (0.0,)))
     ]
 
     # Guard the guard: one case per registered pair, so a family added
     # without a case here fails this count rather than going unchecked.
-    @test length(cases) == 26
+    @test length(cases) == 35
 
     for (D, names, vals, invalid) in cases
         test_reparameterisation(D, names, vals; invalid = invalid)

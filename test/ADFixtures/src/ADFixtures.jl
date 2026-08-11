@@ -18,7 +18,8 @@ using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
 using Distributions: Beta, Exponential, Gamma, InverseGaussian, LogNormal,
-                     NegativeBinomial, Normal, SkewNormal, Weibull, logpdf, cdf
+                     Logistic, NegativeBinomial, Normal, SkewNormal, Uniform,
+                     Weibull, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -183,6 +184,20 @@ function _normal_quantiles_cdf(θ, obs)
     return sum(x -> cdf(d, x), obs)
 end
 
+# `θ = [mean, sd]` through the same constraint solve, reached by the
+# concrete `(:mean, :sd)` registration rather than the catch-all. The
+# `Uniform` scale carries a `sqrt(12)`, and its density is flat, so the
+# gradient runs through the support's own edges.
+function _uniform_meansd_loglik(θ, obs)
+    d = reparameterise(Uniform; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+function _logistic_meansd_loglik(θ, obs)
+    d = reparameterise(Logistic; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -244,7 +259,11 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         ("LogNormal(median, quantiles) loglik", _lognormal_mixed_loglik,
             [4.0, 12.0], reals),
         ("Exponential(quantiles) loglik", _exponential_quantile_loglik,
-            [20.0], reals))
+            [20.0], reals),
+        ("Uniform(mean, sd) loglik", _uniform_meansd_loglik, [8.0, 3.0],
+            reals),
+        ("Logistic(mean, sd) loglik", _logistic_meansd_loglik, [8.0, 3.0],
+            reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,

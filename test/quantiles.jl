@@ -262,8 +262,106 @@ end
     # A family this file catches all names for must not swallow a name set
     # it cannot convert: the predicate stays `true` so the conversion's own
     # error surfaces, rather than the request being silently zero-density.
-    @test valid_moments(Normal, Val((:mean, :var)), (8.0, 4.0)) == true
-    @test_throws ArgumentError reparameterise(Normal; mean = 8.0, var = 4.0)
+    @test valid_moments(Normal, Val((:rate, :shape)), (1.0, 2.0)) == true
+    @test_throws ArgumentError reparameterise(Normal; rate = 1.0, shape = 2.0)
+end
+
+@testitem "standard moments: the location-scale families, exact" begin
+    using Distributions
+
+    # Against native parameters worked by hand from each family's own
+    # variance, not against the constraint solve that produces them.
+    m, s = 5.0, 2.0
+    cases = ((Normal, Normal(m, s)),
+        # var = theta^2 * pi^2 / 3, so theta = sd * sqrt(3) / pi.
+        (Logistic, Logistic(m, s * sqrt(3) / pi)),
+        # var = 2 * theta^2, so theta = sd / sqrt(2).
+        (Laplace, Laplace(m, s / sqrt(2))),
+        # var = (b - a)^2 / 12 about a midpoint mean, so the half-width is
+        # sqrt(3) * sd.
+        (Uniform, Uniform(m - sqrt(3) * s, m + sqrt(3) * s)))
+
+    for (D, expected) in cases
+        d = reparameterise(D; mean = m, sd = s)
+        @test native(d) ≈ expected
+        @test mean(d)≈m rtol=1e-12
+        @test std(d)≈s rtol=1e-12
+        @test params(d) == (m, s)
+
+        # The variance spelling is the same conversion at sqrt(var).
+        v = reparameterise(D; mean = m, var = s^2)
+        @test native(v) ≈ expected
+        @test params(v) == (m, s^2)
+    end
+end
+
+@testitem "standard moments: Exponential by its mean" begin
+    using Distributions
+
+    # An Exponential(theta) has mean = theta, so the mean is the scale.
+    d = reparameterise(Exponential; mean = 4.0)
+    @test native(d) ≈ Exponential(4.0)
+    @test mean(d)≈4.0 rtol=1e-12
+    @test params(d) == (4.0,)
+
+    # The same distribution the rate spelling gives.
+    @test native(d) ≈ native(reparameterise(Exponential; rate = 0.25))
+
+    @test_throws DomainError reparameterise(Exponential; mean = -1.0)
+    @test_throws DomainError reparameterise(Exponential; mean = 0.0)
+end
+
+@testitem "standard moments: the moments that pin nothing are refused" begin
+    using Distributions
+
+    # A Cauchy has neither moment, so no Cauchy has the ones asked for.
+    @test_throws ArgumentError reparameterise(Cauchy; mean = 1.0, sd = 2.0)
+    @test_throws ArgumentError reparameterise(Cauchy; mean = 1.0, var = 4.0)
+    try
+        reparameterise(Cauchy; mean = 1.0, sd = 2.0)
+    catch e
+        @test occursin("Cauchy", sprint(showerror, e))
+    end
+
+    # One constraint leaves a two-parameter family short.
+    for D in (Normal, Logistic, Laplace, Uniform, Cauchy, LogNormal)
+        @test_throws ArgumentError reparameterise(D; mean = 1.0)
+    end
+
+    # And an Exponential has sd == mean, so both together are one too many.
+    @test_throws ArgumentError reparameterise(Exponential; mean = 1.0,
+        sd = 2.0)
+    @test_throws ArgumentError reparameterise(Exponential; mean = 1.0,
+        var = 4.0)
+end
+
+@testitem "quantiles: the derived scale has to survive, not just the values" begin
+    using Distributions
+    using ReparameterisedDistributions: valid_moments
+
+    # #93/#94 in constraint coordinates: each value is finite and ordered,
+    # yet the scale the pair implies is not a scale any member has.
+    #
+    # Far enough apart and the scale overflows.
+    @test valid_moments(Normal, Val((0.25, 0.75)),
+        (-1e308, 1e308)) == false
+    @test logpdf(
+        reparameterise(
+            Normal; quantiles = (0.25 => -1e308,
+                0.75 => 1e308), check_args = false),
+        0.0) == -Inf
+
+    # Close enough together and it collapses to zero.
+    @test valid_moments(Normal, Val((0.25, 0.75)), (1.0, 1.0)) == false
+
+    # A Uniform carries the width in its second native parameter, so the
+    # quantity that has to survive is the far edge. A width too small to
+    # register against its own location gives `a == b`, which is no
+    # Uniform even though the scale itself is positive — and the same
+    # numbers are a perfectly ordinary Normal, so the check has to be the
+    # family's own rather than shared.
+    @test valid_moments(Uniform, Val((:mean, :sd)), (1e300, 1e270)) == false
+    @test valid_moments(Normal, Val((:mean, :sd)), (1e300, 1e270)) == true
 end
 
 @testitem "quantiles: a narrower value type is not widened" begin

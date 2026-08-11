@@ -472,21 +472,35 @@ end
 
     # Guard the guard: if the extraction above silently matched nothing, the
     # loop below would pass vacuously.
-    @test length(registered) == 16
+    @test length(registered) == 19
 
     # A `to_native` registered with no matching `valid_moments` compiles and
     # passes every check above: the 3-arg fallback reports it always valid,
     # so the omission is silent rather than caught here or at construction.
     @test issetequal(registered, _registered_pairs(RD.valid_moments))
 
+    # A registered pair either CONVERTS — concretely, never admitting
+    # `nothing` — or REFUSES, raising unconditionally so its inferred
+    # return type is `Union{}`. A refusal is registered only to say why a
+    # combination describes no member of the family; it is what stands
+    # where a conversion cannot exist, so the two below are named rather
+    # than waved through by a blanket allowance for `Union{}`.
+    refusals = [(Exponential, (:mean, :sd)), (Exponential, (:mean, :var))]
+
     for (D, names) in registered
         args = (Type{D}, Val{names}, NTuple{length(names), Float64})
         rts = Base.return_types(RD.to_native, args)
         @test length(rts) == 1
         rt = only(rts)
-        @test !(Nothing <: rt)
-        @test rt <: D
-        @test isconcretetype(rt)
+        if (D, names) in refusals
+            @test rt === Union{}
+            @test_throws ArgumentError RD.to_native(
+                D, Val(names), ntuple(_ -> 1.0, length(names)))
+        else
+            @test !(Nothing <: rt)
+            @test rt <: D
+            @test isconcretetype(rt)
+        end
     end
 
     # `to_native`'s own return type is not the whole invariant: a call site
