@@ -46,9 +46,10 @@ import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,
                       logccdf, quantile, mean, var, sampler, mode, modes,
                       skewness, kurtosis, entropy, mgf, cf, loglikelihood
 # Types and constructors we use without extending.
-using Distributions: Distributions, Distribution, Beta, Exponential, Gamma,
-                     InverseGaussian, LogNormal, NegativeBinomial, SkewNormal,
-                     Univariate, VariateForm, ValueSupport, Weibull
+using Distributions: Distributions, Distribution, Beta, Cauchy, Exponential,
+                     Gamma, InverseGaussian, Laplace, LogNormal, Logistic,
+                     NegativeBinomial, Normal, SkewNormal, Uniform, Univariate,
+                     VariateForm, ValueSupport, Weibull
 
 # Register the standard EpiAware docstring conventions before any docstrings
 # are defined (see src/docstrings.jl).
@@ -65,11 +66,12 @@ export reparameterise, rescale, native
 # The abstract supertype, then the concrete wrapper and its front door, then
 # the numeric fallback the front door dispatches to when no closed form is
 # registered, then the per-family conversions themselves (closed-form and
-# numeric alike).
+# numeric alike), then the conversions from elicited quantiles.
 include("interface.jl")
 include("Reparameterised.jl")
 include("numeric.jl")
 include("families.jl")
+include("quantiles.jl")
 # The interface test suite's stub; its implementation is a package extension
 # on Test, so a test suite reaches it with `using Test`.
 include("testing.jl")

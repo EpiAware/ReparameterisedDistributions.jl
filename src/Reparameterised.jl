@@ -27,7 +27,7 @@ end
 # Build the wrapper, taking the variate form and value support from the family
 # being wrapped so a discrete family (a NegativeBinomial by mean and
 # overdispersion, say) does not silently become continuous.
-function _reparameterised(::Type{D}, names::Tuple{Vararg{Symbol}},
+function _reparameterised(::Type{D}, names::Tuple{Vararg{Union{Symbol, Real}}},
         vals::Tuple{Vararg{Real}}) where {D}
     F = Distributions.variate_form(D)
     S = Distributions.value_support(D)
@@ -103,6 +103,10 @@ function reparameterise(::Type{D}; check_args::Bool = true,
     isempty(nt) && throw(ArgumentError(
         "reparameterise($(D)) needs the alternative parameters as keywords, " *
         "e.g. reparameterise($(D); mean = 8.0, sd = 2.0)"))
+    # `haskey` on a `NamedTuple` reads its type, so the branch is settled at
+    # compile time and only one path is emitted.
+    haskey(nt, :quantiles) &&
+        return _build_quantiles(D, nt; check_args = check_args)
     return _build(D, Val(keys(nt)), Tuple(nt); check_args = check_args)
 end
 
@@ -178,8 +182,15 @@ end
 # `Symbol`s, and comparing `Symbol`s goes through a `ccall` (`jl_symbol_name`)
 # that Mooncake cannot differentiate — and this sits on the sampler's hot path,
 # because a model reconstructs the distribution at every gradient evaluation.
+#
+# A name is a `Symbol` for a moment and a probability for an elicited
+# quantile, so the order is over a heterogeneous tuple: moments first,
+# alphabetically, then quantiles by ascending probability.
+_name_order(n::Symbol) = (0, string(n), 0.0)
+_name_order(n::Real) = (1, "", Float64(n))
+
 @generated function _canonical(::Val{names}, vals::Tuple) where {names}
-    p = sortperm(collect(names))
+    p = sortperm(collect(names), by = _name_order)
     sorted = Tuple(collect(names)[p])
     permuted = Expr(:tuple, (:(vals[$(p[i])]) for i in eachindex(p))...)
     return :(($(QuoteNode(sorted)), $permuted))
@@ -471,8 +482,21 @@ function loglikelihood(
     return loglikelihood(nd, x)
 end
 
+# The probabilities live in the type and `params` reports only the values,
+# so the printed form has to put the pairs back together.
+function _spec_string(names, vals)
+    args = String["$n = $v" for (n, v) in zip(names, vals) if n isa Symbol]
+    qs = String["$n => $v" for (n, v) in zip(names, vals) if !(n isa Symbol)]
+    # A one-element tuple keeps its trailing comma, so the printed form is
+    # still a tuple when pasted back.
+    isempty(qs) ||
+        push!(args, "quantiles = (" * join(qs, ", ") *
+                    (length(qs) == 1 ? ",)" : ")"))
+    return join(args, ", ")
+end
+
 function Base.show(io::IO, d::Reparameterised{D, names}) where {D, names}
-    args = join(("$n = $v" for (n, v) in zip(names, d.vals)), ", ")
+    args = _spec_string(names, d.vals)
     # `nameof`, not `D` itself: printing the type directly qualifies it by
     # module whenever the active module differs from the one `D` is defined
     # in (a doctest sandbox, a TestItemRunner module, ...), so the same call

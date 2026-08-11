@@ -129,8 +129,9 @@ end
           "reparameterise(Exponential; quantiles = (0.95 => 3.0,))"
 
     m = reparameterise(LogNormal; median = 4.0, quantiles = (0.95 => 12.0,))
-    @test sprint(show, m) == "reparameterise(LogNormal; median = 4.0, " *
-                             "quantiles = (0.95 => 12.0,))"
+    @test sprint(show, m) ==
+          "reparameterise(LogNormal; median = 4.0, " *
+          "quantiles = (0.95 => 12.0,))"
 end
 
 @testitem "quantiles: decreasing values describe no distribution" begin
