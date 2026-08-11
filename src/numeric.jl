@@ -323,11 +323,25 @@ _newton_tol(::Type{T}) where {T} = eps(T)^(3 // 4)
 # of differentiation by the Enzyme and Mooncake extensions (see
 # `solve_moments`), so the branches, the line search and the finite
 # differences inside it never reach a tape.
+#
+# Each seed is promoted to a single element type first. A seed builder
+# legitimately produces a mixed-type tuple — an unconstrained coordinate
+# keeps whatever type the caller's own value had, while a log-scale one
+# comes back as whatever `log` returned — and under an AD type `_primal`
+# does not strip, those two are concretely different types, which no
+# homogeneous `NTuple` signature matches. Measured under ReverseDiff,
+# whose `TrackedReal` carries its tape's array type as a parameter, so a
+# `:real` coordinate arrives as `TrackedReal{..., TrackedArray}` beside a
+# `:positive` one at `TrackedReal{..., Nothing}`, and `_newton_solve`
+# raises a `MethodError` on the pair. Promoting here rather than
+# constraining what a caller's `seeds` may return keeps that contract on
+# the driver, and leaves the tape intact — the correction reinjects the
+# derivative regardless of what the iteration did with it.
 function _solve_moment_system(f::F, seeds::Tuple) where {F}
-    z, jac, converged = _newton_solve(f, seeds[1])
+    z, jac, converged = _newton_solve(f, promote(seeds[1]...))
     for k in 2:length(seeds)
         converged && break
-        z, jac, converged = _newton_solve(f, seeds[k])
+        z, jac, converged = _newton_solve(f, promote(seeds[k]...))
     end
     return (z, jac, converged)
 end
