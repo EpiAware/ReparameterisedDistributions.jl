@@ -312,7 +312,9 @@ valid_moments(LogNormal, Val((:mean, :sd)), (8.0, -1.0))
 # See also
 - [`to_native`](@ref): the conversion this guards, registered alongside it.
 "
-valid_moments(::Type{D}, ::Val{names}, vals) where {D, names} = true
+function valid_moments(::Type{D}, ::Val{names}, vals) where {D, names}
+    return true
+end
 
 # Force the native conversion through the family's own argument checks once,
 # at construction. `to_native` itself builds with `check_args = false` so it

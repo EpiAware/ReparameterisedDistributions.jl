@@ -23,15 +23,32 @@ const _LinearMoments = Union{Laplace, Logistic, Normal, Uniform}
 # The number of constraints a family's exact inversion needs, which is its
 # native parameter count, or `nothing` where no exact inversion is
 # registered. `nothing` is the seam the generic numeric solve plugs into.
-_constraint_arity(::Type) = nothing
-_constraint_arity(::Type{<:_LocationScale}) = 2
-_constraint_arity(::Type{Exponential}) = 1
+function _constraint_arity(::Type)
+    return nothing
+end
+function _constraint_arity(::Type{<:_LocationScale})
+    return 2
+end
+function _constraint_arity(::Type{Exponential})
+    return 1
+end
 
 # The moment names that inversion can express, alongside any probabilities.
-_moment_names(::Type) = ()
-_moment_names(::Type{<:_LocationScale}) = (:median,)
-_moment_names(::Type{<:_LinearMoments}) = (:mean, :median, :sd)
-_moment_names(::Type{Exponential}) = (:mean, :median)
+# An Exponential's mean is not among them: it is the family's only
+# parameter, so `(:mean,)` is a whole constraint set and is registered
+# concretely below rather than reached as a row.
+function _moment_names(::Type)
+    return ()
+end
+function _moment_names(::Type{<:_LocationScale})
+    return (:median,)
+end
+function _moment_names(::Type{<:_LinearMoments})
+    return (:mean, :median, :sd)
+end
+function _moment_names(::Type{Exponential})
+    return (:median,)
+end
 
 # --- The standard member ----------------------------------------------------
 
@@ -47,10 +64,18 @@ _std_quantile(::Type{Exponential}, p) = -log1p(-p)
 
 # The standard member's own standard deviation, so an `sd` constraint is a
 # row in the scale.
-_std_sd(::Type{Normal}) = 1.0
-_std_sd(::Type{Logistic}) = pi / sqrt(3)
-_std_sd(::Type{Laplace}) = sqrt(2)
-_std_sd(::Type{Uniform}) = 1 / sqrt(12)
+function _std_sd(::Type{Normal})
+    return 1.0
+end
+function _std_sd(::Type{Logistic})
+    return pi / sqrt(3)
+end
+function _std_sd(::Type{Laplace})
+    return sqrt(2)
+end
+function _std_sd(::Type{Uniform})
+    return 1 / sqrt(12)
+end
 
 # The transform taking the variate into the location-scale space.
 _ls_transform(::Type, x) = x
@@ -59,8 +84,12 @@ _ls_transform(::Type{LogNormal}, x) = log(x)
 # Constraint values the transform is undefined at, screened before the solve
 # rather than after: `log` throws on a non-positive argument, and
 # `valid_moments` must answer without throwing.
-_in_domain(::Type, v) = true
-_in_domain(::Type{LogNormal}, v) = v > 0
+function _in_domain(::Type, v)
+    return true
+end
+function _in_domain(::Type{LogNormal}, v)
+    return v > 0
+end
 
 # Building the native distribution from the solved location and scale.
 _from_location_scale(::Type{Normal}, mu, s) = Normal(mu, s; check_args = false)
@@ -102,8 +131,6 @@ end
 function _constraint_row(::Type{D}, ::Val{:mean}, v) where {D <: _LinearMoments}
     return _constraint_row(D, 1 / 2, v)
 end
-
-_constraint_row(::Type{Exponential}, ::Val{:mean}, v) = (zero(v), one(v), v)
 
 function _constraint_row(::Type{D}, ::Val{:sd}, v) where {D <: _LinearMoments}
     return (zero(v), oftype(v, _std_sd(D)), v)
@@ -272,14 +299,12 @@ end
 #
 # `D` is a static parameter, so the branch is settled at compile time and
 # the return type stays concrete family by family.
+#
+# Only `_LinearMoments` and `Cauchy` need an answer: LogNormal is the rest
+# of the union, and its own `(:mean, :sd)` and `(:mean, :var)` methods in
+# families.jl are more specific than anything here, so it never arrives.
 _assert_standard_moments(::Type{<:_LinearMoments}) = nothing
 _assert_standard_moments(::Type{Cauchy}) = _no_cauchy_moments()
-# Unreachable: LogNormal's own `(:mean, :sd)` and `(:mean, :var)` methods in
-# families.jl are more specific than anything here. Registered so the union
-# is covered whatever is added to it later.
-function _assert_standard_moments(::Type{LogNormal})
-    throw(ArgumentError(_unconvertible_message(LogNormal, (:mean, :sd))))
-end
 
 # A location and a scale are what these families' mean and standard
 # deviation already are, so the shared constraint solve answers this
@@ -332,7 +357,10 @@ function to_native(::Type{D}, ::Val{(:mean,)}, vals) where {D <: _LocationScale}
     throw(ArgumentError(_unconvertible_message(D, (:mean,))))
 end
 
-valid_moments(::Type{D}, ::Val{(:mean,)}, vals) where {D <: _LocationScale} = true
+function valid_moments(::Type{D}, ::Val{(:mean,)},
+        vals) where {D <: _LocationScale}
+    return true
+end
 
 # A Cauchy's mean and variance are both undefined, so no Cauchy has the
 # ones asked for and no solve can find one.
@@ -360,8 +388,12 @@ function to_native(::Type{Exponential}, ::Val{(:mean, :var)}, vals)
     return _exponential_over_determined()
 end
 
-valid_moments(::Type{Exponential}, ::Val{(:mean, :sd)}, vals) = true
-valid_moments(::Type{Exponential}, ::Val{(:mean, :var)}, vals) = true
+function valid_moments(::Type{Exponential}, ::Val{(:mean, :sd)}, vals)
+    return true
+end
+function valid_moments(::Type{Exponential}, ::Val{(:mean, :var)}, vals)
+    return true
+end
 
 # --- The front door ---------------------------------------------------------
 

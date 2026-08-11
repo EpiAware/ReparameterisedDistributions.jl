@@ -364,6 +364,101 @@ end
     @test valid_moments(Normal, Val((:mean, :sd)), (1e300, 1e270)) == true
 end
 
+@testitem "quantiles: the registration table says what it claims" begin
+    using Distributions
+    import ReparameterisedDistributions as RD
+
+    # The table every constraint set is checked against. It is read from
+    # inside a `@generated` body, so nothing reaches it at run time and a
+    # wrong entry would surface only as a puzzling refusal somewhere else.
+    #
+    # Held in `Any` containers so each lookup is a real dynamic call. A
+    # family named as a literal is a compile-time constant, and these
+    # methods return constants, so the compiler folds the answer and the
+    # method never actually runs — which is also why the table reads as
+    # uncovered when it is asserted the direct way.
+    two = Any[Normal, LogNormal, Logistic, Cauchy, Uniform, Laplace]
+    for D in two
+        @test RD._constraint_arity(D) == 2
+        # The arity is the family's native parameter count, not a number
+        # chosen to suit the solve.
+        @test length(fieldnames(D)) == 2
+    end
+    @test RD._constraint_arity(Any[Exponential][1]) == 1
+    @test length(fieldnames(Exponential)) == 1
+
+    # A family with no exact inversion has no arity, which is what sends a
+    # quantile request to the seam rather than to a wrong solve.
+    for D in Any[Gamma, Beta, Weibull, InverseGaussian, NegativeBinomial]
+        @test RD._constraint_arity(D) === nothing
+        @test RD._moment_names(D) == ()
+    end
+
+    # The moment names each inversion can express. A Cauchy has neither
+    # moment and a LogNormal's are linear in neither native parameter, so
+    # both offer the median alone.
+    for D in Any[Cauchy, LogNormal, Exponential]
+        @test RD._moment_names(D) == (:median,)
+    end
+    for D in Any[Normal, Logistic, Uniform, Laplace]
+        @test RD._moment_names(D) == (:mean, :median, :sd)
+    end
+
+    # The standard member's own standard deviation, which is what turns an
+    # `sd` constraint into a row in the scale. Checked against each
+    # family's own `std` rather than restated as a formula.
+    for (D, standard) in Any[(Normal, Normal(0.0, 1.0)),
+        (Logistic, Logistic(0.0, 1.0)), (Laplace, Laplace(0.0, 1.0)),
+        (Uniform, Uniform(0.0, 1.0))]
+        @test RD._std_sd(D) ≈ std(standard)
+    end
+
+    # Only a LogNormal restricts where its constraint values may fall, and
+    # it does so because the log transform is taken before the solve.
+    for (D, v, expected) in Any[(LogNormal, 1.0, true),
+        (LogNormal, -1.0, false), (LogNormal, 0.0, false),
+        (Normal, -1.0, true), (Uniform, -1.0, true)]
+        @test RD._in_domain(D, v) === expected
+    end
+end
+
+@testitem "quantiles: a refused pair raises rather than reading zero" begin
+    using Distributions
+    using ReparameterisedDistributions: valid_moments
+
+    # A pair registered only to refuse keeps its predicate `true`, so the
+    # conversion's own error is what a caller sees. `false` would instead
+    # make a meaningless request read as a merely improbable one, giving a
+    # silent `-Inf` where an error belongs.
+    # `Any` so each predicate is a real dynamic call rather than a constant
+    # the compiler folds away before the method runs.
+    refused = Any[(Cauchy, (:mean, :sd), (1.0, 2.0)),
+        (Cauchy, (:mean, :var), (1.0, 4.0)),
+        (Exponential, (:mean, :sd), (1.0, 2.0)),
+        (Exponential, (:mean, :var), (1.0, 4.0)),
+        (Normal, (:mean,), (1.0,)), (Uniform, (:mean,), (1.0,)),
+        (LogNormal, (:mean,), (1.0,))]
+
+    for (D, names, vals) in refused
+        @test valid_moments(D, Val(names), vals) === true
+        # And `check_args = false` does not turn the refusal into a zero
+        # density: the request is meaningless, not improbable.
+        d = ReparameterisedDistributions._build(D, Val(names), vals;
+            check_args = false)
+        @test_throws ArgumentError logpdf(d, 1.0)
+    end
+end
+
+@testitem "quantiles: Exponential by its median" begin
+    using Distributions
+
+    # Q(1/2) = theta * log(2), so the median names the scale too.
+    d = reparameterise(Exponential; median = 2.0)
+    @test native(d) ≈ Exponential(2.0 / log(2.0))
+    @test median(d)≈2.0 rtol=1e-12
+    @test params(d) == (2.0,)
+end
+
 @testitem "quantiles: a narrower value type is not widened" begin
     using Distributions
 
