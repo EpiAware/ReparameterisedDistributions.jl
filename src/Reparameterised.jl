@@ -55,6 +55,14 @@ Pass either the family (`LogNormal`) or an instance of it, whose parameter value
 are ignored — only its family is taken. The keywords are order-insensitive, as
 keywords are everywhere else.
 
+An elicitation often arrives as quantiles rather than moments: a delay quoted
+as a 5th and a 95th percentile. The `quantiles` keyword takes
+`probability => value` pairs, and the elicited values become the parameters, so
+a prior goes on the quantity that was elicited. Probabilities are arbitrary, and
+quantiles mix with moment keywords — one moment and one tail point is a common
+elicitation. The number of constraints has to match the family's native
+parameter count.
+
 # Arguments
 - `dist_or_type`: the native family to wrap, as a type or an instance.
 - `check_args`: whether to reject invalid parameters at construction. Left on by
@@ -63,7 +71,8 @@ keywords are everywhere else.
   exception raised in the middle of a gradient. Every other method still
   converts, so an invalid distribution has no mean, no quantile and no draw, and
   asking for one raises.
-- `alt_params`: the alternative parameters, as keywords.
+- `alt_params`: the alternative parameters, as keywords. `quantiles` is
+  reserved for elicited quantiles, given as `probability => value` pairs.
 
 !!! note
     `params` reports the moments, so the usual
@@ -92,6 +101,19 @@ using ReparameterisedDistributions, Distributions
 
 d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 params(native(d))
+```
+
+```@example
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(LogNormal; quantiles = (0.05 => 1.2, 0.95 => 8.4))
+(params(d), quantile(d, 0.05), quantile(d, 0.95))
+```
+
+```@example
+using ReparameterisedDistributions, Distributions
+
+reparameterise(LogNormal; median = 4.0, quantiles = (0.95 => 12.0,))
 ```
 
 # See also

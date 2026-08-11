@@ -22,6 +22,7 @@ Both are public, not exported, and both take the same three arguments.
 
 `D` is the distribution type being converted to, any subtype of `Distributions.Distribution` defined in this package, in Distributions.jl, or in your own.
 `names` is the tuple of alternative parameter names, carried as a `Val` so the pair is resolved at compile time rather than by comparing symbols at run time.
+An entry is a `Symbol` for a moment and a probability for an elicited quantile, so a constraint set that mixes the two reaches these hooks through the same dispatch.
 `vals` is the alternative parameter values, in `names` order, already promoted to a common floating-point type.
 
 Every call site in the package (`reparameterise`, `native`, `logpdf`, `pdf`, `loglikelihood` and the REPL `show` method) checks the predicate and then, separately, calls the conversion.
@@ -58,12 +59,13 @@ Keyword arguments are order-insensitive everywhere else in Julia, and `reparamet
 Register both methods under the **sorted** names.
 `Val((:mean, :sd))` is found; `Val((:sd, :mean))` is never reached.
 For `NegativeBinomial` by dispersion and mean the canonical order is `(:dispersion, :mean)`, and for `Gamma` by shape and rate it is `(:rate, :shape)`, however the user types the keywords.
+Moment names come before quantile probabilities, and probabilities themselves ascend, so a median elicited with a 95th percentile is `Val((:median, 0.95))`.
 
 `params` reports the values in that same sorted order.
 
 ## A worked example
 
-`Laplace` is not registered by this package.
+This package registers `Laplace` by quantile constraints and by nothing else, so a mean and a standard deviation are free to register here.
 A `Laplace(mu, theta)` has mean `mu` and variance `2 * theta^2`, so the location is native and `theta = sd / sqrt(2)`.
 The location is unconstrained, so only the scale needs guarding.
 
@@ -143,7 +145,7 @@ It checks that:
 - `to_native` is inferred to a single, concrete distribution type of the family, and never admits `nothing`;
 - the wrapper builds, reports the given values as its `params`, and keeps the family's variate form and value support, so a discrete family stays discrete;
 - `native`, `logpdf` and `pdf` are type-inferred, and the densities and draws agree with the native distribution;
-- any parameter named `mean`, `sd` or `var` comes back out of the built distribution, which is what checks the conversion's algebra rather than only its types;
+- any parameter named `mean`, `sd`, `var` or `median`, and every elicited quantile, comes back out of the built distribution, which is what checks the conversion's algebra rather than only its types;
 - each `invalid` tuple is refused by the predicate, raises a `DomainError` at construction, and gives `logpdf == -Inf` and `pdf == 0` with `check_args = false`.
 
 Pass at least one `invalid` tuple.

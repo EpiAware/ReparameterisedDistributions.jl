@@ -266,6 +266,31 @@ end
     @test_throws ArgumentError reparameterise(Normal; mean = 8.0, var = 4.0)
 end
 
+@testitem "quantiles: a narrower value type is not widened" begin
+    using Distributions
+
+    # The probabilities are `Float64` whatever the values are, so the
+    # conversion has to bring them into the values' own type rather than
+    # promote the wrapper up to `Float64`.
+    d = reparameterise(Normal; quantiles = (0.25 => 1.0f0, 0.75 => 3.0f0))
+    @test eltype(params(d)) === Float32
+    @test native(d) isa Normal{Float32}
+end
+
+@testitem "quantiles: rescale routes through a mixed constraint set" begin
+    using Distributions
+
+    # `rescale` scales a registered name and rebuilds through the same
+    # conversion, so a moment mixed with a quantile is scaled in the
+    # constraint coordinates rather than by an affine transform.
+    d = reparameterise(Normal; mean = 8.0, quantiles = (0.95 => 20.0,))
+    @test mean(rescale(d, 2.0)) ≈ 16.0
+    @test quantile(rescale(d, 2.0), 0.95)≈20.0 rtol=1e-12
+
+    # A probability is not a name `rescale` can be asked for.
+    @test_throws DomainError rescale(d, 2.0; parameter = :median)
+end
+
 @testitem "quantiles: the exact inversions are usable through the interface" begin
     using Distributions, Random, Statistics
 

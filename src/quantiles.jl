@@ -141,8 +141,11 @@ end
     return :($(allunique(probs)))
 end
 
-# The seam the generic numeric solve for constraint sets plugs into: until
-# it lands, a set with no exact inversion says so by name here.
+# The seam the generic numeric solve for constraint sets plugs into. A set
+# with no exact inversion — a Gamma elicited by two quantiles, a LogNormal
+# by a mean and a tail point — reaches here, and the throw below is what the
+# solve replaces: everything above it, the front door and the constraint
+# rows alike, already carries such a set through unchanged.
 function _assert_convertible(::Type{D}, ::Val{names}) where {D, names}
     _convertible(D, Val(names)) && return nothing
     throw(ArgumentError(_unconvertible_message(D, names)))
