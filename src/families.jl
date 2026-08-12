@@ -36,8 +36,10 @@ end
 # coordinates, which can disagree with `sqrt(var)^2` in the last bit.
 function valid_moments(::Type{LogNormal}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return var > 0 && valid_moments(LogNormal, Val((:mean, :sd)),
-        (mean, sqrt(var)))
+    return var > 0 && valid_moments(
+        LogNormal, Val((:mean, :sd)),
+        (mean, sqrt(var))
+    )
 end
 
 # Gamma by mean and standard deviation. A Gamma(shape, scale) has
@@ -68,8 +70,10 @@ end
 
 function valid_moments(::Type{Gamma}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return var > 0 && valid_moments(Gamma, Val((:mean, :sd)),
-        (mean, sqrt(var)))
+    return var > 0 && valid_moments(
+        Gamma, Val((:mean, :sd)),
+        (mean, sqrt(var))
+    )
 end
 
 # Gamma by mean and shape: the shape is native, so only the scale is
@@ -96,8 +100,10 @@ end
 #
 # The family is DISCRETE; the wrapper takes its value support from it, so
 # this stays discrete rather than silently becoming continuous.
-function to_native(::Type{NegativeBinomial},
-        ::Val{(:mean, :overdispersion)}, vals)
+function to_native(
+        ::Type{NegativeBinomial},
+        ::Val{(:mean, :overdispersion)}, vals
+    )
     mean, a = vals
     p = 1 / (1 + a * mean)
     return NegativeBinomial(1 / a, p; check_args = false)
@@ -107,8 +113,10 @@ end
 # diverges, so it is rejected alongside `a < 0`. `isfinite(1 / a)` also
 # catches `a` small enough to underflow the division without being
 # exactly zero (measured: `a = 1e-320` gives `r = Inf`).
-function valid_moments(::Type{NegativeBinomial},
-        ::Val{(:mean, :overdispersion)}, vals)
+function valid_moments(
+        ::Type{NegativeBinomial},
+        ::Val{(:mean, :overdispersion)}, vals
+    )
     mean, a = vals
     return mean > 0 && a > 0 && isfinite(1 / a)
 end
@@ -120,15 +128,19 @@ end
 #
 # The canonical (sorted) name order is `(:dispersion, :mean)`, not
 # `(:mean, :dispersion)`: `_canonical` sorts alphabetically, and 'd' < 'm'.
-function to_native(::Type{NegativeBinomial},
-        ::Val{(:dispersion, :mean)}, vals)
+function to_native(
+        ::Type{NegativeBinomial},
+        ::Val{(:dispersion, :mean)}, vals
+    )
     dispersion, mean = vals
     p = dispersion / (dispersion + mean)
     return NegativeBinomial(dispersion, p; check_args = false)
 end
 
-function valid_moments(::Type{NegativeBinomial},
-        ::Val{(:dispersion, :mean)}, vals)
+function valid_moments(
+        ::Type{NegativeBinomial},
+        ::Val{(:dispersion, :mean)}, vals
+    )
     dispersion, mean = vals
     return dispersion > 0 && mean > 0
 end
@@ -170,15 +182,19 @@ end
 #   alpha = tan(pi * (1/2 - mass_below_centre)),  0 < mass_below_centre < 1.
 #
 # The canonical (sorted) name order is `(:centre, :mass_below_centre, :scale)`.
-function to_native(::Type{SkewNormal},
-        ::Val{(:centre, :mass_below_centre, :scale)}, vals)
+function to_native(
+        ::Type{SkewNormal},
+        ::Val{(:centre, :mass_below_centre, :scale)}, vals
+    )
     centre, m, scale = vals
     alpha = tan(pi * (1 / 2 - m))
     return SkewNormal(centre, scale, alpha; check_args = false)
 end
 
-function valid_moments(::Type{SkewNormal},
-        ::Val{(:centre, :mass_below_centre, :scale)}, vals)
+function valid_moments(
+        ::Type{SkewNormal},
+        ::Val{(:centre, :mass_below_centre, :scale)}, vals
+    )
     centre, m, scale = vals
     return scale > 0 && 0 < m < 1
 end
@@ -216,8 +232,10 @@ end
 
 function valid_moments(::Type{Beta}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return var > 0 && valid_moments(Beta, Val((:mean, :sd)),
-        (mean, sqrt(var)))
+    return var > 0 && valid_moments(
+        Beta, Val((:mean, :sd)),
+        (mean, sqrt(var))
+    )
 end
 
 # InverseGaussian by mean and standard deviation. The native
@@ -246,8 +264,10 @@ end
 
 function valid_moments(::Type{InverseGaussian}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return var > 0 && valid_moments(InverseGaussian, Val((:mean, :sd)),
-        (mean, sqrt(var)))
+    return var > 0 && valid_moments(
+        InverseGaussian, Val((:mean, :sd)),
+        (mean, sqrt(var))
+    )
 end
 
 # Weibull by mean and standard deviation. Unlike every family above, this has
@@ -327,8 +347,10 @@ end
 # form, `b = mean / Γ(1 + 1/a) = mean * exp(-logΓ(1 + u))`.
 function to_native(::Type{Weibull}, ::Val{(:mean, :sd)}, vals)
     mean, sd = vals
-    s = solve_moment(Weibull, Val((:mean, :sd)), _weibull_residual,
-        _weibull_deriv, _weibull_bracket, vals)
+    s = solve_moment(
+        Weibull, Val((:mean, :sd)), _weibull_residual,
+        _weibull_deriv, _weibull_bracket, vals
+    )
     u = exp(-s)
     return Weibull(exp(s), mean * exp(-loggamma(1 + u)); check_args = false)
 end
@@ -340,6 +362,8 @@ end
 
 function valid_moments(::Type{Weibull}, ::Val{(:mean, :var)}, vals)
     mean, var = vals
-    return var > 0 && valid_moments(Weibull, Val((:mean, :sd)),
-        (mean, sqrt(var)))
+    return var > 0 && valid_moments(
+        Weibull, Val((:mean, :sd)),
+        (mean, sqrt(var))
+    )
 end

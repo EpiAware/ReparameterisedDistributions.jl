@@ -57,8 +57,11 @@ test_reparameterisation(Gamma, (:mean, :sd), (8.0, 3.0);
 - [`valid_moments`](@ref): the other.
 "
 function test_reparameterisation(::Type{D}, names, vals; kwargs...) where {D}
-    throw(ArgumentError(
-        "the reparameterisation interface test suite lives in a package " *
-        "extension; `using Test` loads " *
-        "ReparameterisedDistributionsTestExt, which supplies it"))
+    throw(
+        ArgumentError(
+            "the reparameterisation interface test suite lives in a package " *
+                "extension; `using Test` loads " *
+                "ReparameterisedDistributionsTestExt, which supplies it"
+        )
+    )
 end

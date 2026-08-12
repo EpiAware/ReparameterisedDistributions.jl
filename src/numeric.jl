@@ -89,8 +89,10 @@ solve_moment(Gamma, Val((:shape,)), (s, vals) -> exp(s) - vals[1],
 # See also
 - [`to_native`](@ref): the conversion a numeric family calls this from.
 "
-function solve_moment(::Type{D}, ::Val{names}, residual::R, deriv::G,
-        bracket::B, vals) where {D, names, R, G, B}
+function solve_moment(
+        ::Type{D}, ::Val{names}, residual::R, deriv::G,
+        bracket::B, vals
+    ) where {D, names, R, G, B}
     pvals = map(_primal, vals)
     lo, hi = bracket(pvals)
     f = s -> residual(s, pvals)
@@ -119,11 +121,14 @@ end
 # Deliberately no solver-type argument and no `solver =` keyword: with a
 # single backend shipped that would be a knob nobody threads through.
 function _solve_moment_equation(f, lo, hi)
-    throw(ArgumentError(
-        "this parameterisation is converted by a scalar root-find, " *
-        "and no solver backend is loaded; add Roots.jl to your " *
-        "project and `using Roots` to load " *
-        "ReparameterisedDistributionsRootsExt, which supplies it"))
+    throw(
+        ArgumentError(
+            "this parameterisation is converted by a scalar root-find, " *
+                "and no solver backend is loaded; add Roots.jl to your " *
+                "project and `using Roots` to load " *
+                "ReparameterisedDistributionsRootsExt, which supplies it"
+        )
+    )
 end
 
 # --- The three ways a numeric conversion fails cleanly -----------------------
@@ -135,26 +140,38 @@ end
 # (b) The moment equation does not change sign over the registered bracket:
 # throw before the solver runs, so the message names the family and the
 # working type rather than surfacing Roots' generic bracketing complaint.
-function _check_bracket(::Type{D}, ::Val{names}, vals, flo,
-        fhi) where {D, names}
+function _check_bracket(
+        ::Type{D}, ::Val{names}, vals, flo,
+        fhi
+    ) where {D, names}
     (isfinite(flo) && isfinite(fhi) && flo * fhi < 0) && return nothing
-    throw(DomainError(vals,
-        "the moment equation for $(D) by $(collect(names)) does not " *
-        "change sign over the registered bracket, so these moments " *
-        "are outside the numerically solvable region for " *
-        "$(eltype(vals))"))
+    throw(
+        DomainError(
+            vals,
+            "the moment equation for $(D) by $(collect(names)) does not " *
+                "change sign over the registered bracket, so these moments " *
+                "are outside the numerically solvable region for " *
+                "$(eltype(vals))"
+        )
+    )
 end
 
 # (c) The solve ran, but the corrected root misses tolerance: throw rather
 # than return a distribution whose moments differ from what was asked for.
 _moment_atol(::Type{T}) where {T} = sqrt(eps(T))
 
-function _check_solved(::Type{D}, ::Val{names}, residual::R, s,
-        vals) where {D, names, R}
+function _check_solved(
+        ::Type{D}, ::Val{names}, residual::R, s,
+        vals
+    ) where {D, names, R}
     r = residual(s, vals)
     abs(r) <= _moment_atol(float(typeof(r))) && return nothing
-    throw(DomainError(vals,
-        "the numeric conversion of $(D) by $(collect(names)) did not " *
-        "converge: residual $(r) at solved value $(s), " *
-        "tolerance $(_moment_atol(float(typeof(r))))"))
+    throw(
+        DomainError(
+            vals,
+            "the numeric conversion of $(D) by $(collect(names)) did not " *
+                "converge: residual $(r) at solved value $(s), " *
+                "tolerance $(_moment_atol(float(typeof(r))))"
+        )
+    )
 end

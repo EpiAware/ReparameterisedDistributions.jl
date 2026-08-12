@@ -13,6 +13,12 @@ const QA_CONFIG = (
     # Path to the isolated JET environment (see test/jet/Project.toml).
     jet_env = joinpath(@__DIR__, "..", "jet"),
 
+    # Path to the isolated formatter environment (see
+    # test/formatter/Project.toml). Runs the formatting check in a subprocess
+    # pinned to the exact Runic version, rather than whatever version the
+    # shared test environment resolves on the CI Julia in use (#321).
+    formatter_env = joinpath(@__DIR__, "..", "formatter"),
+
     # Per-check Aqua relaxations, e.g. (; ambiguities = false). Empty = all on.
     aqua = (;),
 
@@ -44,13 +50,20 @@ const QA_CONFIG = (
     #      expect_phantoms = false,    # true if a third party adds phantoms
     #      broken = false)             # true to quarantine a known ambiguity
     extensions = (
-        (; name = :ReparameterisedDistributionsRootsExt,
+        (;
+            name = :ReparameterisedDistributionsRootsExt,
             triggers = ("Roots",),
-            prefixes = ("ReparameterisedDistributions", "Roots")),
-        (; name = :ReparameterisedDistributionsForwardDiffExt,
+            prefixes = ("ReparameterisedDistributions", "Roots"),
+        ),
+        (;
+            name = :ReparameterisedDistributionsForwardDiffExt,
             triggers = ("ForwardDiff",),
-            prefixes = ("ReparameterisedDistributions", "ForwardDiff")),
-        (; name = :ReparameterisedDistributionsTestExt,
+            prefixes = ("ReparameterisedDistributions", "ForwardDiff"),
+        ),
+        (;
+            name = :ReparameterisedDistributionsTestExt,
             triggers = ("Test",),
-            prefixes = ("ReparameterisedDistributions", "Test")))
+            prefixes = ("ReparameterisedDistributions", "Test"),
+        ),
+    ),
 )

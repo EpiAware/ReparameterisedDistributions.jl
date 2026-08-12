@@ -35,7 +35,7 @@ using Random: AbstractRNG
 # Docstring-template machinery used by src/docstrings.jl (imports are
 # centralised here per the kit's import-centralisation gate).
 using DocStringExtensions: @template, DOCSTRING, EXPORTS, IMPORTS, TYPEDEF,
-                           TYPEDFIELDS, TYPEDSIGNATURES
+    TYPEDFIELDS, TYPEDSIGNATURES
 # The Weibull numeric conversion's own mathematics (src/families.jl):
 # already in this package's dependency closure through Distributions, so
 # this costs no new install and no new transitive package.
@@ -43,12 +43,12 @@ using SpecialFunctions: digamma, loggamma
 
 # Functions we extend for the wrapper.
 import Distributions: params, insupport, pdf, logpdf, cdf, logcdf, ccdf,
-                      logccdf, quantile, mean, var, sampler, mode, modes,
-                      skewness, kurtosis, entropy, mgf, cf, loglikelihood
+    logccdf, quantile, mean, var, sampler, mode, modes,
+    skewness, kurtosis, entropy, mgf, cf, loglikelihood
 # Types and constructors we use without extending.
 using Distributions: Distributions, Distribution, Beta, Exponential, Gamma,
-                     InverseGaussian, LogNormal, NegativeBinomial, SkewNormal,
-                     Univariate, VariateForm, ValueSupport, Weibull
+    InverseGaussian, LogNormal, NegativeBinomial, SkewNormal,
+    Univariate, VariateForm, ValueSupport, Weibull
 
 # Register the standard EpiAware docstring conventions before any docstrings
 # are defined (see src/docstrings.jl).

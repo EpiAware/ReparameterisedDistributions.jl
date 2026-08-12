@@ -9,27 +9,33 @@
 # every backend the kit knows about; add/trim backends and categories to
 # match the package afterwards (this file is write-once).
 
-@testitem "ForwardDiff gradients (marginal)" tags=[:ad, :forwarddiff] setup=[ADHelpers] begin
+@testitem "ForwardDiff gradients (marginal)" tags = [:ad, :forwarddiff] setup = [ADHelpers] begin
     test_working_backend("ForwardDiff")
 end
 
-@testitem "ReverseDiff (tape) gradients (marginal)" tags=[:ad, :reversediff] setup=[ADHelpers] begin
+@testitem "ReverseDiff (tape) gradients (marginal)" tags = [:ad, :reversediff] setup = [ADHelpers] begin
     test_working_backend("ReverseDiff (tape)")
 end
 
-@testitem "Enzyme forward gradients (marginal)" tags=[:ad, :enzyme, :enzyme_forward] setup=[ADHelpers] begin
+@testitem "ReverseDiff (compiled) gradients (marginal)" tags = [
+    :ad, :reversediff_compiled,
+] setup = [ADHelpers] begin
+    test_working_backend("ReverseDiff (compiled)")
+end
+
+@testitem "Enzyme forward gradients (marginal)" tags = [:ad, :enzyme, :enzyme_forward] setup = [ADHelpers] begin
     test_working_backend("Enzyme forward")
 end
 
-@testitem "Enzyme reverse gradients (marginal)" tags=[:ad, :enzyme, :enzyme_reverse] setup=[ADHelpers] begin
+@testitem "Enzyme reverse gradients (marginal)" tags = [:ad, :enzyme, :enzyme_reverse] setup = [ADHelpers] begin
     test_working_backend("Enzyme reverse")
 end
 
-@testitem "Mooncake reverse gradients (marginal)" tags=[:ad, :mooncake, :mooncake_reverse] setup=[ADHelpers] begin
+@testitem "Mooncake reverse gradients (marginal)" tags = [:ad, :mooncake, :mooncake_reverse] setup = [ADHelpers] begin
     test_working_backend("Mooncake reverse")
 end
 
-@testitem "Mooncake forward gradients (marginal)" tags=[:ad, :mooncake, :mooncake_forward] setup=[ADHelpers] begin
+@testitem "Mooncake forward gradients (marginal)" tags = [:ad, :mooncake, :mooncake_forward] setup = [ADHelpers] begin
     test_working_backend("Mooncake forward")
 end
 
@@ -55,13 +61,14 @@ end
 # cannot catch a process abort, so exercising that combination here
 # would take down this CI job with no diagnostic. It is documented,
 # never executed.
-@testitem "Weibull(mean, sd) Hessian is broken under Enzyme (documented)" tags=[
-    :ad, :enzyme, :enzyme_forward, :enzyme_reverse] setup=[ADHelpers] begin
+@testitem "Weibull(mean, sd) Hessian is broken under Enzyme (documented)" tags = [
+    :ad, :enzyme, :enzyme_forward, :enzyme_reverse,
+] setup = [ADHelpers] begin
     f(θ) = ADFixtures._weibull_meansd_loglik(θ, ADFixtures._OBS)
-    θ=[8.0, 3.0]
+    θ = [8.0, 3.0]
     for mode in (Enzyme.Forward, Enzyme.Reverse)
-        backend=ADTypes.AutoEnzyme(mode = Enzyme.set_runtime_activity(mode))
+        backend = ADTypes.AutoEnzyme(mode = Enzyme.set_runtime_activity(mode))
         @test_broken DifferentiationInterface.hessian(f, backend, θ) isa
-                     AbstractMatrix
+            AbstractMatrix
     end
 end

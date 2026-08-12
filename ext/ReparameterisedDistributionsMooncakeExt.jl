@@ -17,6 +17,7 @@ using ReparameterisedDistributions: _solve_moment_equation
 using Mooncake: Mooncake
 
 Mooncake.@zero_derivative Mooncake.DefaultCtx Tuple{
-    typeof(_solve_moment_equation), Any, Real, Real}
+    typeof(_solve_moment_equation), Any, Real, Real,
+}
 
 end

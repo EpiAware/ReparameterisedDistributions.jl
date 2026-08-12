@@ -11,29 +11,43 @@
     # running it over this package's own families keeps the two honest
     # against each other.
     cases = [
-        (LogNormal, (:mean, :sd), (8.0, 2.0),
-            ((8.0, -1.0), (-8.0, 1.0))),
-        (LogNormal, (:mean, :var), (8.0, 4.0),
-            ((8.0, -4.0), (-8.0, 4.0))),
+        (
+            LogNormal, (:mean, :sd), (8.0, 2.0),
+            ((8.0, -1.0), (-8.0, 1.0)),
+        ),
+        (
+            LogNormal, (:mean, :var), (8.0, 4.0),
+            ((8.0, -4.0), (-8.0, 4.0)),
+        ),
         (Gamma, (:mean, :sd), (8.0, 3.0), ((8.0, -1.0), (-8.0, 1.0))),
         (Gamma, (:mean, :var), (8.0, 9.0), ((8.0, -9.0), (-8.0, 9.0))),
         (Gamma, (:mean, :shape), (8.0, 3.0), ((8.0, -3.0), (-8.0, 3.0))),
         (Gamma, (:rate, :shape), (0.5, 2.0), ((-0.5, 2.0), (0.5, -2.0))),
         (Exponential, (:rate,), (0.5,), ((-0.5,), (0.0,))),
-        (NegativeBinomial, (:mean, :overdispersion), (10.0, 0.1),
-            ((10.0, 0.0), (-10.0, 0.1))),
-        (NegativeBinomial, (:dispersion, :mean), (2.0, 10.0),
-            ((-2.0, 10.0), (2.0, -10.0))),
-        (SkewNormal, (:centre, :mass_below_centre, :scale), (0.0, 0.3, 1.0),
-            ((0.0, 0.0, 1.0), (0.0, 0.3, -1.0))),
+        (
+            NegativeBinomial, (:mean, :overdispersion), (10.0, 0.1),
+            ((10.0, 0.0), (-10.0, 0.1)),
+        ),
+        (
+            NegativeBinomial, (:dispersion, :mean), (2.0, 10.0),
+            ((-2.0, 10.0), (2.0, -10.0)),
+        ),
+        (
+            SkewNormal, (:centre, :mass_below_centre, :scale), (0.0, 0.3, 1.0),
+            ((0.0, 0.0, 1.0), (0.0, 0.3, -1.0)),
+        ),
         (Beta, (:mean, :sd), (0.3, 0.1), ((0.5, 0.5), (1.5, 0.1))),
         (Beta, (:mean, :var), (0.3, 0.01), ((0.5, 0.3), (1.5, 0.01))),
-        (InverseGaussian, (:mean, :sd), (3.0, 2.0),
-            ((3.0, -2.0), (-3.0, 2.0))),
-        (InverseGaussian, (:mean, :var), (3.0, 4.0),
-            ((3.0, -4.0), (-3.0, 4.0))),
+        (
+            InverseGaussian, (:mean, :sd), (3.0, 2.0),
+            ((3.0, -2.0), (-3.0, 2.0)),
+        ),
+        (
+            InverseGaussian, (:mean, :var), (3.0, 4.0),
+            ((3.0, -4.0), (-3.0, 4.0)),
+        ),
         (Weibull, (:mean, :sd), (8.0, 3.0), ((8.0, -3.0), (-8.0, 3.0))),
-        (Weibull, (:mean, :var), (8.0, 9.0), ((8.0, -9.0), (-8.0, 9.0)))
+        (Weibull, (:mean, :var), (8.0, 9.0), ((8.0, -9.0), (-8.0, 9.0))),
     ]
 
     # Guard the guard: one case per registered pair, so a family added
@@ -59,19 +73,23 @@ end
     # location is native and `theta = sd / sqrt(2)`. The location is
     # unconstrained, so only the scale is guarded.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals
+        )
         _, sd = vals
         return sd > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals
+        )
         m, sd = vals
         return Laplace(m, sd / sqrt(oftype(sd, 2)); check_args = false)
     end
 
-    test_reparameterisation(Laplace, (:mean, :sd), (3.0, 2.0);
-        invalid = ((3.0, -2.0), (3.0, 0.0)))
+    test_reparameterisation(
+        Laplace, (:mean, :sd), (3.0, 2.0);
+        invalid = ((3.0, -2.0), (3.0, 0.0))
+    )
 end
 
 @testitem "the checks test_reparameterisation relies on catch a bad pair" begin
@@ -105,8 +123,10 @@ end
     # Guard the guard: a pair already known to pass the suite should
     # pass both predicates directly, too.
     let argtypes = (Type{Gamma}, Val{(:mean, :sd)}, Tuple{Float64, Float64})
-        fallback = which(to_native,
-            (Type{Gamma}, Val{(:_unregistered_,)}, Tuple{Float64, Float64}))
+        fallback = which(
+            to_native,
+            (Type{Gamma}, Val{(:_unregistered_,)}, Tuple{Float64, Float64})
+        )
         @test which(to_native, argtypes) !== fallback
         rt = only(Base.return_types(to_native, argtypes))
         @test !(Nothing <: rt)
@@ -120,21 +140,27 @@ end
     # error-raising fallback, exactly as it would for every caller of
     # `reparameterise` on an uncanonically registered family.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
+            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals
+        )
         scale, _ = vals
         return scale > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
+            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals
+        )
         scale, location = vals
         return Cauchy(location, scale; check_args = false)
     end
 
-    let argtypes = (Type{Cauchy}, Val{(:location, :scale)},
-            Tuple{Float64, Float64})
-        fallback = which(to_native,
-            (Type{Cauchy}, Val{(:_unregistered_,)}, Tuple{Float64, Float64}))
+    let argtypes = (
+            Type{Cauchy}, Val{(:location, :scale)},
+            Tuple{Float64, Float64},
+        )
+        fallback = which(
+            to_native,
+            (Type{Cauchy}, Val{(:_unregistered_,)}, Tuple{Float64, Float64})
+        )
         @test which(to_native, argtypes) === fallback
     end
 
@@ -143,20 +169,24 @@ end
     # `nothing`, so its inferred return type is a `Union` even though this
     # particular call (`var = 2.0 > 0`) never actually takes that branch.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+            ::Type{Laplace}, ::Val{(:mean, :var)}, vals
+        )
         _, v = vals
         return v > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+            ::Type{Laplace}, ::Val{(:mean, :var)}, vals
+        )
         m, v = vals
         v <= 0 && return nothing
         return Laplace(m, sqrt(v / oftype(v, 2)); check_args = false)
     end
 
-    let argtypes = (Type{Laplace}, Val{(:mean, :var)},
-            Tuple{Float64, Float64})
+    let argtypes = (
+            Type{Laplace}, Val{(:mean, :var)},
+            Tuple{Float64, Float64},
+        )
         rt = only(Base.return_types(to_native, argtypes))
         @test Nothing <: rt
     end
@@ -176,7 +206,8 @@ end
     # extension's more specific one, can match. Mirrors the technique
     # already used for `_solve_moment_equation`'s stub in test/numeric.jl.
     @test_throws ArgumentError test_reparameterisation(
-        LogNormal, [:mean, :sd], (8.0, 2.0))
+        LogNormal, [:mean, :sd], (8.0, 2.0)
+    )
     try
         test_reparameterisation(LogNormal, [:mean, :sd], (8.0, 2.0))
     catch e

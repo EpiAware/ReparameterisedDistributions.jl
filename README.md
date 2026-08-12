@@ -3,11 +3,11 @@
 <!-- badges:start -->
 | **Documentation** | **Build Status** | **Code Quality** | **License & DOI** | **Downloads** |
 |:-----------------:|:----------------:|:----------------:|:-----------------:|:-------------:|
-| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://reparameteriseddistributions.epiaware.org/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://reparameteriseddistributions.epiaware.org/dev/) | [![Test](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/test.yaml) [![codecov](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl) [![AD](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/ad.yaml) | [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) | [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FReparameterisedDistributions&query=total_requests&label=Downloads)](https://juliapkgstats.com/pkg/ReparameterisedDistributions) [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FReparameterisedDistributions&query=total_requests&suffix=%2Fmonth&label=Downloads)](https://juliapkgstats.com/pkg/ReparameterisedDistributions) |
+| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://reparameteriseddistributions.epiaware.org/stable/) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://reparameteriseddistributions.epiaware.org/dev/) | [![Test](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/test.yaml) [![codecov](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg)](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl) [![AD](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/ad.yaml/badge.svg?branch=main)](https://github.com/EpiAware/ReparameterisedDistributions.jl/actions/workflows/ad.yaml) | [![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl) [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl) [![JET](https://img.shields.io/badge/%E2%9C%88%EF%B8%8F%20tested%20with%20-%20JET.jl%20-%20red)](https://github.com/aviatesk/JET.jl) | [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) | [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Ftotal_downloads%2FReparameterisedDistributions&query=total_requests&label=Downloads)](https://juliapkgstats.com/pkg/ReparameterisedDistributions) [![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FReparameterisedDistributions&query=total_requests&suffix=%2Fmonth&label=Downloads)](https://juliapkgstats.com/pkg/ReparameterisedDistributions) |
 
-| ForwardDiff | ReverseDiff (tape) | Enzyme forward | Enzyme reverse | Mooncake reverse | Mooncake forward |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| [![cov ForwardDiff](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-forwarddiff)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-forwarddiff) | [![cov ReverseDiff](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-reversediff)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-reversediff) | [![cov Enzyme forward](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-enzyme-forward)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-enzyme-forward) | [![cov Enzyme reverse](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-enzyme-reverse)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-enzyme-reverse) | [![cov Mooncake reverse](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-mooncake-reverse)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-mooncake-reverse) | [![cov Mooncake forward](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-mooncake-forward)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-mooncake-forward) |
+| ForwardDiff | ReverseDiff (tape) | ReverseDiff (compiled) | Enzyme forward | Enzyme reverse | Mooncake reverse | Mooncake forward |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [![cov ForwardDiff](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-forwarddiff)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-forwarddiff) | [![cov ReverseDiff](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-reversediff)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-reversediff) | [![cov ReverseDiff compiled](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-reversediff-compiled)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-reversediff-compiled) | [![cov Enzyme forward](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-enzyme-forward)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-enzyme-forward) | [![cov Enzyme reverse](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-enzyme-reverse)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-enzyme-reverse) | [![cov Mooncake reverse](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-mooncake-reverse)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-mooncake-reverse) | [![cov Mooncake forward](https://codecov.io/gh/EpiAware/ReparameterisedDistributions.jl/graph/badge.svg?flag=ad-mooncake-forward)](https://app.codecov.io/gh/EpiAware/ReparameterisedDistributions.jl?flags%5B0%5D=ad-mooncake-forward) |
 <!-- badges:end -->
 
 *Parameter-convention switches for Distributions.jl.*
@@ -54,31 +54,27 @@ end
 
 chain = sample(delay(y), NUTS(), 500; progress = false)
 
-summarystats(chain)
+Turing.FlexiChains.summarystats(chain)
 ```
 
 The chain comes back in a mean and a standard deviation, the coordinates the
 delay was elicited in, rather than in native parameters that only imply them.
 
 ```julia
-using CairoMakie, AlgebraOfGraphics, DataFramesMeta
+using CairoMakie
 
 CairoMakie.activate!(type = "png", px_per_unit = 2)
 
-draws = DataFrame(
-    value = vcat(vec(chain[:delay_mean]), vec(chain[:delay_sd])),
-    moment = vcat(fill("mean", length(chain[:delay_mean])),
-        fill("sd", length(chain[:delay_sd])))
-)
-actual = DataFrame(moment = ["mean", "sd"], value = [8.0, 3.0])
-
-draw(
-    data(draws) * mapping(:value, layout = :moment) *
-    AlgebraOfGraphics.density() +
-    data(actual) * mapping(:value, layout = :moment) *
-    visual(VLines, color = :black, linestyle = :dash);
-    facet = (; linkxaxes = :none)
-)
+fig = Figure()
+for (i, (label, draws, actual)) in enumerate((
+        ("mean", vec(chain[:delay_mean]), 8.0),
+        ("sd", vec(chain[:delay_sd]), 3.0)
+    ))
+    ax = Axis(fig[1, i]; title = label)
+    density!(ax, draws)
+    vlines!(ax, [actual]; color = :black, linestyle = :dash)
+end
+fig
 ```
 
 ## Related packages
@@ -114,7 +110,7 @@ draw(
 
 ## Contributing
 
-We welcome contributions and new contributors! Please open an issue or pull request on [GitHub](https://github.com/EpiAware/ReparameterisedDistributions.jl). This package follows [ColPrac](https://github.com/SciML/ColPrac) and the [SciML style](https://github.com/SciML/SciMLStyle).
+We welcome contributions and new contributors! Please open an issue or pull request on [GitHub](https://github.com/EpiAware/ReparameterisedDistributions.jl). This package follows [ColPrac](https://github.com/SciML/ColPrac) and is formatted with [Runic](https://github.com/fredrikekre/Runic.jl).
 
 ## How to cite
 

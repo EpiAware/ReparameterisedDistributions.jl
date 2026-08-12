@@ -68,8 +68,8 @@ end
     draws = rand(Xoshiro(1), d, 20_000)
 
     # The moments the distribution is named by are the moments it draws with.
-    @test Statistics.mean(draws)≈8.0 rtol=0.05
-    @test Statistics.std(draws)≈2.0 rtol=0.1
+    @test Statistics.mean(draws) ≈ 8.0 rtol = 0.05
+    @test Statistics.std(draws) ≈ 2.0 rtol = 0.1
     @test all(>(0), draws)
 end
 
@@ -131,15 +131,23 @@ end
     # `check_args = false` exists so a sampler exploring an unconstrained
     # parameter gets a density back at an invalid proposal rather than an
     # exception raised mid-gradient. That is a contract, so it is tested.
-    for bad in (reparameterise(LogNormal; mean = 8.0, sd = -1.0,
-        check_args = false),
-        reparameterise(LogNormal; mean = -8.0, sd = 2.0, check_args = false),
-        reparameterise(Gamma; mean = 8.0, sd = -1.0, check_args = false),
-        reparameterise(Gamma; mean = 8.0, shape = -1.0, check_args = false),
-        reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.0,
-        check_args = false),
-        reparameterise(NegativeBinomial; mean = -10.0, overdispersion = 0.1,
-        check_args = false))
+    for bad in (
+            reparameterise(
+                LogNormal; mean = 8.0, sd = -1.0,
+                check_args = false
+            ),
+            reparameterise(LogNormal; mean = -8.0, sd = 2.0, check_args = false),
+            reparameterise(Gamma; mean = 8.0, sd = -1.0, check_args = false),
+            reparameterise(Gamma; mean = 8.0, shape = -1.0, check_args = false),
+            reparameterise(
+                NegativeBinomial; mean = 10.0, overdispersion = 0.0,
+                check_args = false
+            ),
+            reparameterise(
+                NegativeBinomial; mean = -10.0, overdispersion = 0.1,
+                check_args = false
+            ),
+        )
         @test logpdf(bad, 4.0) == -Inf
         @test pdf(bad, 4.0) == 0.0
     end
@@ -166,9 +174,11 @@ end
     # `mean > 0 && sd > 0` check, but `scale = sd^2 / mean` overflows and
     # `shape = mean / scale` comes back `0.0`. `valid_moments` now rejects
     # this point directly.
-    overflowed = reparameterise(Gamma; mean = 1e150, sd = 1e200,
-        check_args = false)
-    @test valid_moments(Gamma, Val((:mean, :sd)), (1e150, 1e200)) == false
+    overflowed = reparameterise(
+        Gamma; mean = 1.0e150, sd = 1.0e200,
+        check_args = false
+    )
+    @test valid_moments(Gamma, Val((:mean, :sd)), (1.0e150, 1.0e200)) == false
     @test logpdf(overflowed, 4.0) == -Inf
     @test pdf(overflowed, 4.0) == 0.0
 end
@@ -192,7 +202,7 @@ end
     @test valid_moments(Gamma, Val((:mean, :var)), (8.0, -4.0)) == false
     @test valid_moments(Beta, Val((:mean, :var)), (0.3, -0.01)) == false
     @test valid_moments(InverseGaussian, Val((:mean, :var)), (3.0, -4.0)) ==
-          false
+        false
     @test valid_moments(Weibull, Val((:mean, :var)), (8.0, -9.0)) == false
 end
 
@@ -217,11 +227,11 @@ end
     # Julia keywords are order-insensitive everywhere else, and the package's
     # only public entry point must not be the exception.
     @test reparameterise(LogNormal; sd = 2.0, mean = 8.0) ==
-          reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+        reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     @test reparameterise(Gamma; shape = 3.0, mean = 8.0) ==
-          reparameterise(Gamma; mean = 8.0, shape = 3.0)
+        reparameterise(Gamma; mean = 8.0, shape = 3.0)
     @test reparameterise(NegativeBinomial; overdispersion = 0.1, mean = 10.0) ==
-          reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1)
+        reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1)
 end
 
 @testitem "reparameterise: the moment summaries are reported" begin
@@ -269,14 +279,19 @@ end
     d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
     out = sprint(show, MIME("text/plain"), d)
     @test out ==
-          "reparameterise(LogNormal; mean = 8.0, sd = 2.0)\n" *
-          "  native: " * sprint(show, native(d))
+        "reparameterise(LogNormal; mean = 8.0, sd = 2.0)\n" *
+        "  native: " * sprint(show, native(d))
     @test occursin("LogNormal", out)
 
     invalid = reparameterise(
-        LogNormal; mean = 8.0, sd = -1.0, check_args = false)
-    @test occursin("invalid parameters", sprint(show, MIME("text/plain"),
-        invalid))
+        LogNormal; mean = 8.0, sd = -1.0, check_args = false
+    )
+    @test occursin(
+        "invalid parameters", sprint(
+            show, MIME("text/plain"),
+            invalid
+        )
+    )
 end
 
 @testitem "reparameterise: the rebuild hook promotes like the front door" begin
@@ -287,15 +302,18 @@ end
     # `NTuple{2, Real}` field — that would be boxed, type-unstable and hostile
     # to a gradient.
     d = ReparameterisedDistributions._build(
-        LogNormal, Val((:mean, :sd)), (8, 2.0))
+        LogNormal, Val((:mean, :sd)), (8, 2.0)
+    )
     @test params(d) === (8.0, 2.0)
     @test eltype(params(d)) === Float64
     @test d == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 
     # And it canonicalises the names, so the hook cannot smuggle in an order the
     # front door would reject.
-    @test ReparameterisedDistributions._build(LogNormal, Val((:sd, :mean)),
-        (2.0, 8.0)) == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+    @test ReparameterisedDistributions._build(
+        LogNormal, Val((:sd, :mean)),
+        (2.0, 8.0)
+    ) == reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 end
 
 @testitem "reparameterise: construction is fully inferred" begin
@@ -310,7 +328,8 @@ end
     # matters most exactly where constant folding cannot be relied on: inside
     # an AD tape.
     @noinline build(m::Float64, s::Float64) = reparameterise(
-        LogNormal; mean = m, sd = s)
+        LogNormal; mean = m, sd = s
+    )
     @inferred build(8.0, 2.0)
 
     d = build(8.0, 2.0)

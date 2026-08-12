@@ -15,12 +15,8 @@ const LIGHT_TUTORIALS = String[]
 
 # Heavy tutorials (live MCMC fits, multi-backend AD, plotting) are each
 # executed once in a fresh subprocess so native/memory state cannot accumulate.
-# The `ad-backends.jl` entry is seeded when the package is scaffolded with
-# `ad = true`: the page itself is kit-managed (re-applied on every sync); only
-# this registration is package-owned.
 const HEAVY_TUTORIALS = String[
     "priors-on-moments.jl",
-    "ad-backends.jl"
 ]
 
 # Where the tutorial `.jl` sources and rendered `.md` pages live, relative to
@@ -33,7 +29,6 @@ const TUTORIALS_SUBDIR = joinpath("getting-started", "tutorials")
 # resolve in a fast build.
 const TUTORIAL_STUBS = Pair{String, String}[
     "priors-on-moments.md" => "# [Priors on moments](@id priors-on-moments)",
-    "ad-backends.md" => "# [Automatic differentiation backends](@id ad-backends)"
 ]
 
 # Heavy tutorials that always render from their `TUTORIAL_STUBS` heading and
@@ -62,7 +57,7 @@ const FORCE_STUB_TUTORIALS = String[]
 # Drop this second ignore once the adoption has landed on `main`.
 const LINKCHECK_IGNORE = [
     r"^https://reparameteriseddistributions\.epiaware\.org",
-    r"^https://github\.com/EpiAware/ReparameterisedDistributions\.jl/blob/main/CITATION\.cff"
+    r"^https://github\.com/EpiAware/ReparameterisedDistributions\.jl/blob/main/CITATION\.cff",
 ]
 
 # README -> index.md link rewrites: `from => to` pairs applied line by line,
@@ -97,6 +92,21 @@ const INDEX_STRIP_SECTIONS = String[]
 # table-only page with an `@info` note when absent rather than failing the
 # build).
 const BENCHMARK_PAGE = true
+
+# Heavy benchmark-page scripts under `docs/src/benchmarks/`, same convention
+# as `HEAVY_TUTORIALS` (#299/#305). The `ad-comparison.jl` entry is seeded
+# when the package is scaffolded with `ad = true`: the page itself is
+# kit-managed (re-applied on every sync); only this registration is
+# package-owned.
+const HEAVY_BENCHMARKS = String[
+    "ad-comparison.jl",
+]
+
+# Fast-build stubs for the benchmark pages, same convention as
+# `TUTORIAL_STUBS`.
+const BENCHMARK_STUBS = Pair{String, String}[
+    "ad-comparison.md" => "# [AD backend comparison](@id ad-comparison)\n\n## [Choosing a backend](@id ad-backends)",
+]
 
 # Headline benchmark suites to keep on the performance-history page. A suite is
 # the first `/`-segment of a benchmark's name (e.g. "AD gradients" in

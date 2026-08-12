@@ -24,7 +24,7 @@ end
     by_var = reparameterise(Gamma; mean = 8.0, var = 9.0)
 
     @test native(by_var) ≈
-          native(by_sd)
+        native(by_sd)
     @test params(by_var) == (8.0, 9.0)
 end
 
@@ -73,8 +73,10 @@ end
     using Distributions
 
     centre, scale, m = 0.0, 1.0, 0.3
-    d = reparameterise(SkewNormal; centre = centre, scale = scale,
-        mass_below_centre = m)
+    d = reparameterise(
+        SkewNormal; centre = centre, scale = scale,
+        mass_below_centre = m
+    )
 
     # alpha = tan(pi * (1/2 - m)) is the exact inverse of
     # P(X < centre) = 1/2 - atan(alpha) / pi for the untruncated family.
@@ -89,36 +91,46 @@ end
     # implemented there), so the elicited mass is checked against the closed
     # form directly rather than via `cdf(d, centre)`, which would MethodError
     # for a native SkewNormal too.
-    @test 1 / 2 - atan(alpha) / pi≈m rtol=1e-12
+    @test 1 / 2 - atan(alpha) / pi ≈ m rtol = 1.0e-12
 end
 
 @testitem "SkewNormal: a symmetric (m = 1/2) elicitation gives alpha = 0" begin
     using Distributions
 
     # Half the mass below the centre is the symmetric case: no skew.
-    d = reparameterise(SkewNormal; centre = 1.0, scale = 2.0,
-        mass_below_centre = 0.5)
+    d = reparameterise(
+        SkewNormal; centre = 1.0, scale = 2.0,
+        mass_below_centre = 0.5
+    )
     _, _, alpha = params(native(d))
-    @test alpha≈0.0 atol=1e-12
+    @test alpha ≈ 0.0 atol = 1.0e-12
     @test mean(d) ≈ 1.0
 end
 
 @testitem "SkewNormal: the closed form validates its moments" begin
     using Distributions
 
-    @test_throws DomainError reparameterise(SkewNormal; centre = 0.0,
-        scale = -1.0, mass_below_centre = 0.3)
-    @test_throws DomainError reparameterise(SkewNormal; centre = 0.0,
-        scale = 1.0, mass_below_centre = 0.0)
-    @test_throws DomainError reparameterise(SkewNormal; centre = 0.0,
-        scale = 1.0, mass_below_centre = 1.0)
+    @test_throws DomainError reparameterise(
+        SkewNormal; centre = 0.0,
+        scale = -1.0, mass_below_centre = 0.3
+    )
+    @test_throws DomainError reparameterise(
+        SkewNormal; centre = 0.0,
+        scale = 1.0, mass_below_centre = 0.0
+    )
+    @test_throws DomainError reparameterise(
+        SkewNormal; centre = 0.0,
+        scale = 1.0, mass_below_centre = 1.0
+    )
 end
 
 @testitem "SkewNormal is usable through the density/sampling Distributions interface" begin
     using Distributions, Random, Statistics
 
-    d = reparameterise(SkewNormal; centre = 0.0, scale = 1.0,
-        mass_below_centre = 0.3)
+    d = reparameterise(
+        SkewNormal; centre = 0.0, scale = 1.0,
+        mass_below_centre = 0.3
+    )
     nd = native(d)
 
     # cdf/quantile are not exercised here: Distributions.jl does not
@@ -129,7 +141,7 @@ end
     @test var(d) ≈ var(nd)
 
     draws = rand(Xoshiro(1), d, 20_000)
-    @test Statistics.mean(draws)≈mean(d) rtol=0.05
+    @test Statistics.mean(draws) ≈ mean(d) rtol = 0.05
 end
 
 @testitem "Beta(mean, sd): exact closed form" begin
@@ -145,8 +157,8 @@ end
     # The conversion is exact, so the moments come back out.
     @test params(d) == (m, s)
     @test mean(d) ≈ m
-    @test std(d)≈s rtol=1e-10
-    @test var(d)≈s^2 rtol=1e-10
+    @test std(d) ≈ s rtol = 1.0e-10
+    @test var(d) ≈ s^2 rtol = 1.0e-10
 end
 
 @testitem "Beta(mean, var) agrees with Beta(mean, sd)" begin
@@ -176,7 +188,7 @@ end
 
     # Just inside the bound is valid.
     @test reparameterise(Beta; mean = 0.5, sd = 0.49) isa
-          ReparameterisedDistributions.Reparameterised
+        ReparameterisedDistributions.Reparameterised
 end
 
 @testitem "Beta is usable through the density/sampling Distributions interface" begin
@@ -192,7 +204,7 @@ end
     @test var(d) ≈ var(nd)
 
     draws = rand(Xoshiro(1), d, 20_000)
-    @test Statistics.mean(draws)≈mean(d) rtol=0.05
+    @test Statistics.mean(draws) ≈ mean(d) rtol = 0.05
 end
 
 @testitem "InverseGaussian(mean, sd): exact closed form" begin
@@ -208,8 +220,8 @@ end
 
     @test params(d) == (m, s)
     @test mean(d) ≈ m
-    @test std(d)≈s rtol=1e-10
-    @test var(d)≈s^2 rtol=1e-10
+    @test std(d) ≈ s rtol = 1.0e-10
+    @test var(d) ≈ s^2 rtol = 1.0e-10
 end
 
 @testitem "InverseGaussian(mean, var) agrees with InverseGaussian(mean, sd)" begin
@@ -225,14 +237,22 @@ end
 @testitem "InverseGaussian: the closed form validates its moments" begin
     using Distributions
 
-    @test_throws DomainError reparameterise(InverseGaussian; mean = -3.0,
-        sd = 2.0)
-    @test_throws DomainError reparameterise(InverseGaussian; mean = 0.0,
-        sd = 2.0)
-    @test_throws DomainError reparameterise(InverseGaussian; mean = 3.0,
-        sd = -2.0)
-    @test_throws DomainError reparameterise(InverseGaussian; mean = 3.0,
-        var = -4.0)
+    @test_throws DomainError reparameterise(
+        InverseGaussian; mean = -3.0,
+        sd = 2.0
+    )
+    @test_throws DomainError reparameterise(
+        InverseGaussian; mean = 0.0,
+        sd = 2.0
+    )
+    @test_throws DomainError reparameterise(
+        InverseGaussian; mean = 3.0,
+        sd = -2.0
+    )
+    @test_throws DomainError reparameterise(
+        InverseGaussian; mean = 3.0,
+        var = -4.0
+    )
 end
 
 @testitem "InverseGaussian is usable through the density/sampling Distributions interface" begin
@@ -248,7 +268,7 @@ end
     @test var(d) ≈ var(nd)
 
     draws = rand(Xoshiro(1), d, 20_000)
-    @test Statistics.mean(draws)≈mean(d) rtol=0.05
+    @test Statistics.mean(draws) ≈ mean(d) rtol = 0.05
 end
 
 @testitem "NegativeBinomial(mean, overdispersion): the epi parameterisation" begin
@@ -260,11 +280,11 @@ end
     # The defining relation is var = mean + a * mean^2, so a is the excess
     # variance relative to a Poisson.
     @test mean(d) ≈ m
-    @test var(d)≈m + a * m^2 rtol=1e-10
+    @test var(d) ≈ m + a * m^2 rtol = 1.0e-10
 
     # Against the native parameters worked by hand: r = 1/a, p = 1/(1 + a*mean).
     @test native(d) ≈
-          NegativeBinomial(1 / a, 1 / (1 + a * m))
+        NegativeBinomial(1 / a, 1 / (1 + a * m))
 
     @test params(d) == (m, a)
 end
@@ -278,7 +298,7 @@ end
     # The defining relation is var = mean + mean^2 / dispersion, the reciprocal
     # of the overdispersion convention's var = mean + overdispersion * mean^2.
     @test mean(d) ≈ m
-    @test var(d)≈m + m^2 / k rtol=1e-10
+    @test var(d) ≈ m + m^2 / k rtol = 1.0e-10
 
     # Against the native parameters worked by hand: r = dispersion,
     # p = dispersion / (dispersion + mean).
@@ -288,13 +308,13 @@ end
     # `dispersion = 1 / overdispersion`.
     a = 1 / k
     @test native(d) ≈
-          native(reparameterise(NegativeBinomial; mean = m, overdispersion = a))
+        native(reparameterise(NegativeBinomial; mean = m, overdispersion = a))
 
     # The names sort alphabetically ('d' < 'm'), so `params` reports
     # (dispersion, mean) regardless of the keyword order at the call site.
     @test params(d) == (k, m)
     @test params(reparameterise(NegativeBinomial; dispersion = k, mean = m)) ==
-          (k, m)
+        (k, m)
 end
 
 @testitem "NegativeBinomial: larger dispersion approaches the Poisson" begin
@@ -304,15 +324,27 @@ end
     # As dispersion -> Inf the variance falls to the mean, the Poisson limit —
     # the opposite direction from the overdispersion convention, where the
     # limit is `a -> 0`.
-    @test var(reparameterise(NegativeBinomial; mean = m,
-        dispersion = 1e6))≈m rtol=1e-4
-    @test var(reparameterise(NegativeBinomial; mean = m,
-        dispersion = 2.0)) > m
+    @test var(
+        reparameterise(
+            NegativeBinomial; mean = m,
+            dispersion = 1.0e6
+        )
+    ) ≈ m rtol = 1.0e-4
+    @test var(
+        reparameterise(
+            NegativeBinomial; mean = m,
+            dispersion = 2.0
+        )
+    ) > m
 
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = m,
-        dispersion = 0.0)
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = m,
-        dispersion = -1.0)
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = m,
+        dispersion = 0.0
+    )
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = m,
+        dispersion = -1.0
+    )
 end
 
 @testitem "NegativeBinomial stays DISCRETE" begin
@@ -337,14 +369,24 @@ end
 
     m = 10.0
     # As a -> 0 the variance falls to the mean, which is the Poisson limit.
-    @test var(reparameterise(NegativeBinomial; mean = m,
-        overdispersion = 1e-6))≈m rtol=1e-4
-    @test var(reparameterise(NegativeBinomial; mean = m,
-        overdispersion = 0.5)) > m
+    @test var(
+        reparameterise(
+            NegativeBinomial; mean = m,
+            overdispersion = 1.0e-6
+        )
+    ) ≈ m rtol = 1.0e-4
+    @test var(
+        reparameterise(
+            NegativeBinomial; mean = m,
+            overdispersion = 0.5
+        )
+    ) > m
 
     # The limit itself is not a NegativeBinomial: r = 1 / a diverges.
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = m,
-        overdispersion = 0.0)
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = m,
+        overdispersion = 0.0
+    )
 end
 
 @testitem "the closed forms validate their moments" begin
@@ -354,37 +396,51 @@ end
     @test_throws DomainError reparameterise(Gamma; mean = -8.0, sd = 1.0)
     @test_throws DomainError reparameterise(Gamma; mean = 8.0, shape = -1.0)
     @test_throws DomainError reparameterise(Gamma; mean = 8.0, var = -1.0)
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = -1.0,
-        overdispersion = 0.1)
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = 10.0,
-        overdispersion = -0.1)
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = -1.0,
-        dispersion = 2.0)
-    @test_throws DomainError reparameterise(NegativeBinomial; mean = 10.0,
-        dispersion = -2.0)
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = -1.0,
+        overdispersion = 0.1
+    )
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = 10.0,
+        overdispersion = -0.1
+    )
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = -1.0,
+        dispersion = 2.0
+    )
+    @test_throws DomainError reparameterise(
+        NegativeBinomial; mean = 10.0,
+        dispersion = -2.0
+    )
     @test_throws DomainError reparameterise(Exponential; rate = -0.5)
     @test_throws DomainError reparameterise(Exponential; rate = 0.0)
     @test_throws DomainError reparameterise(Gamma; shape = 2.0, rate = -0.5)
     @test_throws DomainError reparameterise(Gamma; shape = -2.0, rate = 0.5)
     @test_throws DomainError reparameterise(Beta; mean = 0.5, sd = 0.5)
     @test_throws DomainError reparameterise(Beta; mean = 1.5, sd = 0.1)
-    @test_throws DomainError reparameterise(InverseGaussian; mean = -3.0,
-        sd = 2.0)
-    @test_throws DomainError reparameterise(InverseGaussian; mean = 3.0,
-        sd = -2.0)
+    @test_throws DomainError reparameterise(
+        InverseGaussian; mean = -3.0,
+        sd = 2.0
+    )
+    @test_throws DomainError reparameterise(
+        InverseGaussian; mean = 3.0,
+        sd = -2.0
+    )
 end
 
 @testitem "the closed forms are usable through the Distributions interface" begin
     using Distributions, Random, Statistics
 
-    for d in (reparameterise(Gamma; mean = 8.0, sd = 3.0),
-        reparameterise(Gamma; mean = 8.0, shape = 3.0),
-        reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1),
-        reparameterise(NegativeBinomial; mean = 10.0, dispersion = 5.0),
-        reparameterise(Exponential; rate = 0.5),
-        reparameterise(Gamma; shape = 3.0, rate = 0.5),
-        reparameterise(Beta; mean = 0.3, sd = 0.1),
-        reparameterise(InverseGaussian; mean = 3.0, sd = 2.0))
+    for d in (
+            reparameterise(Gamma; mean = 8.0, sd = 3.0),
+            reparameterise(Gamma; mean = 8.0, shape = 3.0),
+            reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.1),
+            reparameterise(NegativeBinomial; mean = 10.0, dispersion = 5.0),
+            reparameterise(Exponential; rate = 0.5),
+            reparameterise(Gamma; shape = 3.0, rate = 0.5),
+            reparameterise(Beta; mean = 0.3, sd = 0.1),
+            reparameterise(InverseGaussian; mean = 3.0, sd = 2.0),
+        )
         nd = native(d)
         x = minimum(d) == 0 ? 4 : 4.0
 
@@ -396,7 +452,7 @@ end
 
         # And it draws with the moments it is named by.
         draws = rand(Xoshiro(1), d, 20_000)
-        @test Statistics.mean(draws)≈mean(d) rtol=0.05
+        @test Statistics.mean(draws) ≈ mean(d) rtol = 0.05
     end
 end
 
@@ -408,7 +464,8 @@ end
     # type — not just its value — is inferred even behind a function
     # boundary the compiler cannot constant-fold through.
     @noinline build_beta(m::Float64, s::Float64) = reparameterise(
-        Beta; mean = m, sd = s)
+        Beta; mean = m, sd = s
+    )
     @inferred build_beta(0.3, 0.1)
     db = build_beta(0.3, 0.1)
     @inferred native(db)
@@ -416,7 +473,8 @@ end
     @inferred mean(db)
 
     @noinline build_ig(m::Float64, s::Float64) = reparameterise(
-        InverseGaussian; mean = m, sd = s)
+        InverseGaussian; mean = m, sd = s
+    )
     @inferred build_ig(3.0, 2.0)
     dig = build_ig(3.0, 2.0)
     @inferred native(dig)
@@ -504,19 +562,29 @@ end
     # way `@inferred` does and would miss exactly this.
     function _nothing_unions(f, tt)
         ci, = only(code_typed(f, tt; optimize = false))
-        ts = vcat(collect(something(ci.slottypes, [])),
-            collect(ci.ssavaluetypes))
+        ts = vcat(
+            collect(something(ci.slottypes, [])),
+            collect(ci.ssavaluetypes)
+        )
         return filter(t -> t isa Union && Nothing <: t, ts)
     end
 
-    for d in (reparameterise(NegativeBinomial; mean = 10.0,
-        overdispersion = 0.1),
-        reparameterise(LogNormal; mean = 8.0, sd = 2.0),
-        reparameterise(Weibull; mean = 8.0, sd = 3.0))
+    for d in (
+            reparameterise(
+                NegativeBinomial; mean = 10.0,
+                overdispersion = 0.1
+            ),
+            reparameterise(LogNormal; mean = 8.0, sd = 2.0),
+            reparameterise(Weibull; mean = 8.0, sd = 3.0),
+        )
         @test isempty(_nothing_unions(logpdf, (typeof(d), Float64)))
         @test isempty(_nothing_unions(pdf, (typeof(d), Float64)))
-        @test isempty(_nothing_unions(loglikelihood,
-            (typeof(d), Vector{Float64})))
+        @test isempty(
+            _nothing_unions(
+                loglikelihood,
+                (typeof(d), Vector{Float64})
+            )
+        )
         @test isempty(_nothing_unions(native, (typeof(d),)))
     end
 end

@@ -59,8 +59,10 @@ implied_mean = mean.(native);
 mean_prior = truncated(Normal(8.0, 3.0); lower = 0.0)
 sd_prior = truncated(Normal(3.0, 1.0); lower = 0.0)
 
-moments = [reparameterise(Gamma; mean = rand(mean_prior), sd = rand(sd_prior))
-           for _ in 1:n]
+moments = [
+    reparameterise(Gamma; mean = rand(mean_prior), sd = rand(sd_prior))
+        for _ in 1:n
+]
 direct_mean = mean.(moments);
 
 # Both branches call `mean` on a `Gamma`; only the coordinates the prior was
@@ -80,8 +82,8 @@ priors = vcat(
 
 draw(
     data(@rsubset(priors, :mean < 40)) *
-    mapping(:mean, color = :source) *
-    AlgebraOfGraphics.density()
+        mapping(:mean, color = :source) *
+        AlgebraOfGraphics.density()
 )
 
 # The implied prior is skewed and wider, and puts mass on means outside the
@@ -117,8 +119,10 @@ end
 @model function moment_model(y)
     delay_mean ~ mean_prior
     delay_sd ~ sd_prior
-    y .~ reparameterise(Gamma; mean = delay_mean, sd = delay_sd,
-        check_args = false)
+    y .~ reparameterise(
+        Gamma; mean = delay_mean, sd = delay_sd,
+        check_args = false
+    )
 end
 
 native_chain = sample(native_model(y), NUTS(), 1000; progress = false)
@@ -148,9 +152,9 @@ posteriors = vcat(
 
 draw(
     data(posteriors) * mapping(:mean, color = :fit) *
-    AlgebraOfGraphics.density() +
-    data(DataFrame(mean = [8.0])) * mapping(:mean) *
-    visual(VLines, color = :black, linestyle = :dash)
+        AlgebraOfGraphics.density() +
+        data(DataFrame(mean = [8.0])) * mapping(:mean) *
+        visual(VLines, color = :black, linestyle = :dash)
 )
 
 # Both recover the mean, because 300 observations swamp the prior.

@@ -24,26 +24,26 @@
 # Documenter + DocumenterVitepress build in `docs/make.jl`.
 
 @template (FUNCTIONS, METHODS, MACROS) = """
-                                         $(TYPEDSIGNATURES)
-                                         $(DOCSTRING)
-                                         """
+$(TYPEDSIGNATURES)
+$(DOCSTRING)
+"""
 
 @template TYPES = """
-                  $(TYPEDEF)
-                  $(DOCSTRING)
+$(TYPEDEF)
+$(DOCSTRING)
 
-                  ---
-                  ## Fields
-                  $(TYPEDFIELDS)
-                  """
+---
+## Fields
+$(TYPEDFIELDS)
+"""
 
 @template MODULES = """
-                    $(DOCSTRING)
+$(DOCSTRING)
 
-                    ---
-                    ## Exports
-                    $(EXPORTS)
-                    ---
-                    ## Imports
-                    $(IMPORTS)
-                    """
+---
+## Exports
+$(EXPORTS)
+---
+## Imports
+$(IMPORTS)
+"""

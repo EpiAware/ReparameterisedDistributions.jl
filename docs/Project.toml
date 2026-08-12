@@ -13,7 +13,6 @@
 # to an `@info` note rather than failing the build).
 [deps]
 ADFixtures = "38d65565-7409-4a25-8dde-f48d00d9209f"
-AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Chairmarks = "0ca39b1e-fe0b-4e98-acfc-b1656634c4de"
 DataFramesMeta = "1313f7d8-7da2-5740-9ea0-a2ca25f37964"
@@ -36,7 +35,6 @@ ReparameterisedDistributions = {path = ".."}
 ADFixtures = {path = "../test/ADFixtures"}
 
 [compat]
-AlgebraOfGraphics = "0.13"
 CairoMakie = "0.15"
 Chairmarks = "1"
 DataFramesMeta = "0.15"
@@ -50,5 +48,5 @@ Plots = "1"
 Documenter = "1"
 DocumenterCitations = "1"
 DocumenterVitepress = "0.3"
-EpiAwarePackageTools = "0.3"
+EpiAwarePackageTools = "0.4"
 Literate = "2"

@@ -18,8 +18,10 @@ conversion is resolved at compile time.
 # See also
 - [`reparameterise`](@ref): the public constructor.
 "
-struct Reparameterised{D, names, N, T <: Real, F <: VariateForm,
-    S <: ValueSupport} <: AbstractReparameterisedDistribution{F, S}
+struct Reparameterised{
+        D, names, N, T <: Real, F <: VariateForm,
+        S <: ValueSupport,
+    } <: AbstractReparameterisedDistribution{F, S}
     "The alternative parameter values, in registered `names` order."
     vals::NTuple{N, T}
 end
@@ -27,8 +29,10 @@ end
 # Build the wrapper, taking the variate form and value support from the family
 # being wrapped so a discrete family (a NegativeBinomial by mean and
 # overdispersion, say) does not silently become continuous.
-function _reparameterised(::Type{D}, names::Tuple{Vararg{Symbol}},
-        vals::Tuple{Vararg{Real}}) where {D}
+function _reparameterised(
+        ::Type{D}, names::Tuple{Vararg{Symbol}},
+        vals::Tuple{Vararg{Real}}
+    ) where {D}
     F = Distributions.variate_form(D)
     S = Distributions.value_support(D)
     return Reparameterised{D, names, length(vals), eltype(vals), F, S}(vals)
@@ -97,12 +101,17 @@ params(native(d))
 # See also
 - [`native`](@ref): the native distribution a wrapper converts to.
 "
-function reparameterise(::Type{D}; check_args::Bool = true,
-        alt_params...) where {D <: Distribution}
+function reparameterise(
+        ::Type{D}; check_args::Bool = true,
+        alt_params...
+    ) where {D <: Distribution}
     nt = values(alt_params)
-    isempty(nt) && throw(ArgumentError(
-        "reparameterise($(D)) needs the alternative parameters as keywords, " *
-        "e.g. reparameterise($(D); mean = 8.0, sd = 2.0)"))
+    isempty(nt) && throw(
+        ArgumentError(
+            "reparameterise($(D)) needs the alternative parameters as keywords, " *
+                "e.g. reparameterise($(D); mean = 8.0, sd = 2.0)"
+        )
+    )
     return _build(D, Val(keys(nt)), Tuple(nt); check_args = check_args)
 end
 
@@ -146,25 +155,38 @@ mean(rescale(d, 2.0))
 # See also
 - [`reparameterise`](@ref): the constructor `rescale` rebuilds through.
 "
-function rescale(d::Reparameterised{D, names}, factor::Real;
-        parameter::Symbol = :mean, check_args::Bool = true) where {D, names}
+function rescale(
+        d::Reparameterised{D, names}, factor::Real;
+        parameter::Symbol = :mean, check_args::Bool = true
+    ) where {D, names}
     idx = findfirst(==(parameter), names)
-    idx === nothing && throw(DomainError(parameter,
-        "$(D) is not registered by a `$(parameter)` parameter; the " *
-        "registered parameters are $(names)"))
-    scaled = ntuple(i -> i == idx ? d.vals[i] * factor : d.vals[i],
-        length(names))
+    idx === nothing && throw(
+        DomainError(
+            parameter,
+            "$(D) is not registered by a `$(parameter)` parameter; the " *
+                "registered parameters are $(names)"
+        )
+    )
+    scaled = ntuple(
+        i -> i == idx ? d.vals[i] * factor : d.vals[i],
+        length(names)
+    )
     return _build(D, Val(names), scaled; check_args = check_args)
 end
 
-function rescale(d::Distribution, factor::Real; parameter::Symbol = :mean,
-        check_args::Bool = true)
-    throw(ArgumentError(
-        "rescale needs a distribution built by `reparameterise`, which " *
-        "fixes the registered parameterisation to route through; wrap " *
-        "$(Base.typename(typeof(d)).wrapper) first, e.g. " *
-        "rescale(reparameterise($(Base.typename(typeof(d)).wrapper); " *
-        "mean = ..., ...), $(factor))"))
+function rescale(
+        d::Distribution, factor::Real; parameter::Symbol = :mean,
+        check_args::Bool = true
+    )
+    throw(
+        ArgumentError(
+            "rescale needs a distribution built by `reparameterise`, which " *
+                "fixes the registered parameterisation to route through; wrap " *
+                "$(Base.typename(typeof(d)).wrapper) first, e.g. " *
+                "rescale(reparameterise($(Base.typename(typeof(d)).wrapper); " *
+                "mean = ..., ...), $(factor))"
+        )
+    )
 end
 
 # Keyword arguments are order-insensitive everywhere else in Julia, but `keys` of
@@ -202,17 +224,26 @@ end
 # `reparameterise` failed) for any call that was not fully constant-folded —
 # a real risk under AD, where the surrounding tape rarely preserves the
 # constant propagation a bare literal call gets at the top level.
-function _build(::Type{D}, ::Val{names},
-        vals::Tuple{Vararg{Real}}; check_args::Bool = true) where {D, names}
-    length(names) == length(vals) || throw(ArgumentError(
-        "expected one value per parameter name, got $(length(names)) names " *
-        "and $(length(vals)) values"))
+function _build(
+        ::Type{D}, ::Val{names},
+        vals::Tuple{Vararg{Real}}; check_args::Bool = true
+    ) where {D, names}
+    length(names) == length(vals) || throw(
+        ArgumentError(
+            "expected one value per parameter name, got $(length(names)) names " *
+                "and $(length(vals)) values"
+        )
+    )
     cnames, cvals = _canonical(Val(names), vals)
     pvals = promote(map(float, cvals)...)
     d = _reparameterised(D, cnames, pvals)
     if check_args
-        valid_moments(D, Val(cnames), pvals) || throw(DomainError(pvals,
-            "invalid $(collect(cnames)) for $(D)"))
+        valid_moments(D, Val(cnames), pvals) || throw(
+            DomainError(
+                pvals,
+                "invalid $(collect(cnames)) for $(D)"
+            )
+        )
         _check_native(to_native(D, Val(cnames), pvals))
     end
     return d
@@ -314,8 +345,12 @@ native(d), params(native(d))
 - [`valid_moments`](@ref): the per-family guard checked first.
 "
 function native(d::Reparameterised{D, names}) where {D, names}
-    valid_moments(D, Val(names), d.vals)::Bool || throw(DomainError(d.vals,
-        "invalid $(collect(names)) for $(D)"))
+    valid_moments(D, Val(names), d.vals)::Bool || throw(
+        DomainError(
+            d.vals,
+            "invalid $(collect(names)) for $(D)"
+        )
+    )
     return to_native(D, Val(names), d.vals)
 end
 
@@ -370,10 +405,13 @@ to_native(LogNormal, Val((:mean, :sd)), (8.0, 2.0))
 - [`valid_moments`](@ref): the guard checked before this runs.
 "
 function to_native(::Type{D}, ::Val{names}, vals) where {D, names}
-    throw(ArgumentError(
-        "no reparameterisation of $(D) by $(collect(names)) is " *
-        "registered; the registered parameterisations are listed " *
-        "in the package docs"))
+    throw(
+        ArgumentError(
+            "no reparameterisation of $(D) by $(collect(names)) is " *
+                "registered; the registered parameterisations are listed " *
+                "in the package docs"
+        )
+    )
 end
 
 # --- Distributions.jl interface --------------------------------------------
@@ -464,7 +502,8 @@ Base.rand(rng::AbstractRNG, d::Reparameterised) = rand(rng, native(d))
 # than the other on both arguments at once.
 function loglikelihood(
         d::Reparameterised{D, names, N1, T, Univariate},
-        x::AbstractArray{<:Real, M}) where {D, names, N1, T, M}
+        x::AbstractArray{<:Real, M}
+    ) where {D, names, N1, T, M}
     valid_moments(D, Val(names), d.vals)::Bool ||
         return convert(_restype(d, zero(eltype(x))), -Inf)
     nd = to_native(D, Val(names), d.vals)
@@ -488,8 +527,10 @@ end
 # REPL can afford one more line: the native distribution the wrapper
 # actually evaluates as, which is the thing a user most often wants to check
 # when the moments are unfamiliar territory.
-function Base.show(io::IO, ::MIME"text/plain",
-        d::Reparameterised{D, names}) where {D, names}
+function Base.show(
+        io::IO, ::MIME"text/plain",
+        d::Reparameterised{D, names}
+    ) where {D, names}
     show(io, d)
     print(io, "\n  native: ")
     if valid_moments(D, Val(names), d.vals)::Bool

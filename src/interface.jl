@@ -13,5 +13,7 @@ so a wrapper around a discrete family stays discrete.
 - [`reparameterise`](@ref): the public constructor.
 - [`Reparameterised`](@ref): the concrete wrapper.
 "
-abstract type AbstractReparameterisedDistribution{F <: VariateForm,
-    S <: ValueSupport} <: Distribution{F, S} end
+abstract type AbstractReparameterisedDistribution{
+    F <: VariateForm,
+    S <: ValueSupport,
+} <: Distribution{F, S} end

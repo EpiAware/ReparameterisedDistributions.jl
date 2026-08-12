@@ -11,18 +11,23 @@ module ReparameterisedDistributionsTestExt
 
 import ReparameterisedDistributions: test_reparameterisation
 using ReparameterisedDistributions: native, reparameterise, to_native,
-                                    valid_moments
+    valid_moments
 using Distributions: Distributions, Distribution, logpdf, mean, params, pdf,
-                     std, var
+    std, var
 using Random: Xoshiro
 using Test: @inferred, @test, @test_throws, @testset
 
-function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
+function test_reparameterisation(
+        ::Type{D}, names::Tuple{Vararg{Symbol}},
         vals::Tuple{Vararg{Real}}; invalid = (),
-        rtol::Real = 1.0e-6) where {D}
-    length(names) == length(vals) || throw(ArgumentError(
-        "expected one value per parameter name, got $(length(names)) " *
-        "names and $(length(vals)) values"))
+        rtol::Real = 1.0e-6
+    ) where {D}
+    length(names) == length(vals) || throw(
+        ArgumentError(
+            "expected one value per parameter name, got $(length(names)) " *
+                "names and $(length(vals)) values"
+        )
+    )
 
     # Normalise exactly as `reparameterise` does internally, so every check
     # below runs on the values the registered methods are actually called
@@ -37,8 +42,10 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
         @test issorted(names)
         # The 3-arg fallback, reached by a name tuple nobody registers. A
         # registration that dispatches to it is not registered at all.
-        fallback = which(to_native,
-            (Type{D}, Val{(:_unregistered_,)}, typeof(pvals)))
+        fallback = which(
+            to_native,
+            (Type{D}, Val{(:_unregistered_,)}, typeof(pvals))
+        )
         @test which(to_native, argtypes) !== fallback
 
         # The guard answers `Bool`, and answers `true` here. Every call
@@ -71,9 +78,9 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
         # The variate form and value support come from the family, so a
         # discrete family does not silently become continuous.
         @test Distributions.value_support(typeof(d)) ==
-              Distributions.value_support(D)
+            Distributions.value_support(D)
         @test Distributions.variate_form(typeof(d)) ==
-              Distributions.variate_form(D)
+            Distributions.variate_form(D)
 
         # The conversion runs, lands where inference said it would, and is
         # itself inferred through the wrapper.
@@ -96,11 +103,11 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
         # of (`shape`, `rate`, `mass_below_centre`, …) is left alone.
         for (n, val) in zip(names, pvals)
             if n === :mean
-                @test mean(d)≈val rtol=rtol
+                @test mean(d) ≈ val rtol = rtol
             elseif n === :sd
-                @test std(d)≈val rtol=rtol
+                @test std(d) ≈ val rtol = rtol
             elseif n === :var
-                @test var(d)≈val rtol=rtol
+                @test var(d) ≈ val rtol = rtol
             end
         end
 
@@ -111,9 +118,12 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
             pbad = promote(map(float, bad)...)
             @test !valid_moments(D, Val(names), pbad)
             @test_throws DomainError reparameterise(
-                D; NamedTuple{names}(pbad)...)
-            b = reparameterise(D; check_args = false,
-                NamedTuple{names}(pbad)...)
+                D; NamedTuple{names}(pbad)...
+            )
+            b = reparameterise(
+                D; check_args = false,
+                NamedTuple{names}(pbad)...
+            )
             @test logpdf(b, x) == -Inf
             @test pdf(b, x) == 0
         end

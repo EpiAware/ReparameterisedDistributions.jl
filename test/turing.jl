@@ -4,7 +4,7 @@
 # is what these check. Tagged so they can be skipped during fast local
 # iteration — Turing is a heavy load.
 
-@testitem "Turing: a reparameterised distribution works on the right of ~" tags=[:turing] begin
+@testitem "Turing: a reparameterised distribution works on the right of ~" tags = [:turing] begin
     using Distributions, Turing, Random
 
     @model function delays(x)
@@ -22,14 +22,15 @@
     # wrapper is transparent to the likelihood.
     m, s = 8.0, 2.0
     nd = native(
-        reparameterise(LogNormal; mean = m, sd = s))
+        reparameterise(LogNormal; mean = m, sd = s)
+    )
     expected = logpdf(LogNormal(2.0, 0.5), m) +
-               logpdf(truncated(Normal(2.0, 1.0); lower = 0.1), s) +
-               sum(x -> logpdf(nd, x), obs)
+        logpdf(truncated(Normal(2.0, 1.0); lower = 0.1), s) +
+        sum(x -> logpdf(nd, x), obs)
     @test logjoint(model, (m = m, s = s)) ≈ expected
 end
 
-@testitem "Turing: the moments are what gets sampled" tags=[:turing] begin
+@testitem "Turing: the moments are what gets sampled" tags = [:turing] begin
     using Distributions, Turing, Random
 
     @model function delays(x)
@@ -40,28 +41,32 @@ end
         end
     end
 
-    obs = rand(Xoshiro(1),
+    obs = rand(
+        Xoshiro(1),
         native(
-            reparameterise(LogNormal; mean = 8.0, sd = 2.0)), 200)
+            reparameterise(LogNormal; mean = 8.0, sd = 2.0)
+        ), 200
+    )
 
     chain = sample(Xoshiro(2), delays(obs), NUTS(), 200; progress = false)
 
     # The chain is in MOMENT coordinates — `m` and `s`, not a native `mu`/`sigma`
     # that only implies them. That is the whole point of the package.
-    @test :m in names(chain, :parameters)
-    @test :s in names(chain, :parameters)
-    @test :mu ∉ names(chain, :parameters)
-    @test :sigma ∉ names(chain, :parameters)
+    @test Turing.FlexiChains.has_parameter(chain, @varname(m))
+    @test Turing.FlexiChains.has_parameter(chain, @varname(s))
+    @test !Turing.FlexiChains.has_parameter(chain, @varname(mu))
+    @test !Turing.FlexiChains.has_parameter(chain, @varname(sigma))
 
     # And the sampler, moving in those coordinates, recovers the moments the
     # data were generated with. This only works if the gradient with respect to
     # the moments is right, so it exercises the closed form under AD end to end.
-    @test mean(chain[:m])≈8.0 rtol=0.15
-    @test mean(chain[:s])≈2.0 rtol=0.3
+    @test mean(chain[:m]) ≈ 8.0 rtol = 0.15
+    @test mean(chain[:s]) ≈ 2.0 rtol = 0.3
 end
 
-@testitem "Turing: the numeric fallback works on the right of ~" tags=[
-    :turing] begin
+@testitem "Turing: the numeric fallback works on the right of ~" tags = [
+    :turing,
+] begin
     using Distributions, Turing, Random
 
     # The same shape as the LogNormal tests above, but through the
@@ -72,19 +77,24 @@ end
         m ~ LogNormal(2.0, 0.5)
         s ~ truncated(Normal(2.0, 1.0); lower = 0.1)
         for i in eachindex(x)
-            x[i] ~ reparameterise(Weibull; mean = m, sd = s,
-                check_args = false)
+            x[i] ~ reparameterise(
+                Weibull; mean = m, sd = s,
+                check_args = false
+            )
         end
     end
 
-    obs = rand(Xoshiro(1),
+    obs = rand(
+        Xoshiro(1),
         native(
-            reparameterise(Weibull; mean = 8.0, sd = 2.0)), 200)
+            reparameterise(Weibull; mean = 8.0, sd = 2.0)
+        ), 200
+    )
 
     chain = sample(Xoshiro(2), delays(obs), NUTS(), 200; progress = false)
 
-    @test :m in names(chain, :parameters)
-    @test :s in names(chain, :parameters)
-    @test mean(chain[:m])≈8.0 rtol=0.15
-    @test mean(chain[:s])≈2.0 rtol=0.3
+    @test Turing.FlexiChains.has_parameter(chain, @varname(m))
+    @test Turing.FlexiChains.has_parameter(chain, @varname(s))
+    @test mean(chain[:m]) ≈ 8.0 rtol = 0.15
+    @test mean(chain[:s]) ≈ 2.0 rtol = 0.3
 end
