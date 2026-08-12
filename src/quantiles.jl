@@ -336,9 +336,10 @@ end
 # standard-moment fallback is the mirror image: it fixes the names —
 # `(:mean, :sd)`, `(:mean, :var)`, `(:mean,)` — and leaves the family free.
 # It arrives with #106, as `src/standard_moments.jl`, so that path is a
-# FORWARD reference and is not in this tree yet. Neither is more specific than the other, so
-# every (one of these families, one of those name tuples) pair is
-# ambiguous unless something more specific than both is registered for it.
+# FORWARD reference and is not in this tree yet. Neither is more specific
+# than the other, so every (one of these families, one of those name
+# tuples) pair is ambiguous unless something more specific than both is
+# registered for it.
 #
 # That is what the rest of this section is. Each method fixes both, so it
 # beats the pair by ordinary specificity, and each is the conversion the
