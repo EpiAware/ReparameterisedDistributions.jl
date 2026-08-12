@@ -10,14 +10,34 @@
 module ReparameterisedDistributionsTestExt
 
 import ReparameterisedDistributions: test_reparameterisation
-using ReparameterisedDistributions: native, reparameterise, to_native,
-                                    valid_moments
-using Distributions: Distributions, Distribution, logpdf, mean, params, pdf,
-                     std, var
+using ReparameterisedDistributions: ReparameterisedDistributions, native,
+                                    reparameterise, to_native, valid_moments
+using Distributions: Distributions, Distribution, logpdf, mean, median, params,
+                     pdf, quantile, std, var
 using Random: Xoshiro
 using Test: @inferred, @test, @test_throws, @testset
 
-function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
+# A family nothing registers, so `which` on it always lands on the
+# three-argument fallback. Probing with the family under test instead would
+# find that family's own catch-all method, where it has one — every family
+# reparameterised by quantile constraints does, since a probability cannot
+# be dispatched on.
+struct _NeverRegistered end
+
+# The keyword call `reparameterise` would be given for this constraint set:
+# moment names as their own keywords, probabilities gathered into
+# `quantiles`.
+function _rebuild(::Type{D}, names, vals; check_args::Bool = true) where {D}
+    moments = NamedTuple{Tuple(n for n in names if n isa Symbol)}(Tuple(
+        v for (n, v) in zip(names, vals) if n isa Symbol))
+    qs = Tuple(n => v for (n, v) in zip(names, vals) if !(n isa Symbol))
+    isempty(qs) && return reparameterise(D; check_args = check_args, moments...)
+    return reparameterise(D; check_args = check_args, quantiles = qs,
+        moments...)
+end
+
+function test_reparameterisation(
+        ::Type{D}, names::Tuple{Vararg{Union{Symbol, Real}}},
         vals::Tuple{Vararg{Real}}; invalid = (),
         rtol::Real = 1.0e-6) where {D}
     length(names) == length(vals) || throw(ArgumentError(
@@ -32,13 +52,14 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
 
     @testset "reparameterise($(D); $(join(names, ", ")))" begin
         # Registered, and under the canonical name order. `reparameterise`
-        # sorts its keywords alphabetically before dispatching, so a method
+        # canonicalises its constraint set before dispatching, so a method
         # registered under any other order is never found.
-        @test issorted(names)
-        # The 3-arg fallback, reached by a name tuple nobody registers. A
-        # registration that dispatches to it is not registered at all.
+        @test names ==
+              first(ReparameterisedDistributions._canonical(Val(names), pvals))
+        # The 3-arg fallback. A registration that dispatches to it is not
+        # registered at all.
         fallback = which(to_native,
-            (Type{D}, Val{(:_unregistered_,)}, typeof(pvals)))
+            (Type{_NeverRegistered}, Val{(:_unregistered_,)}, typeof(pvals)))
         @test which(to_native, argtypes) !== fallback
 
         # The guard answers `Bool`, and answers `true` here. Every call
@@ -64,7 +85,7 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
 
         # The wrapper builds, and the alternative parameters are its
         # parameters.
-        d = reparameterise(D; NamedTuple{names}(pvals)...)
+        d = _rebuild(D, names, pvals)
         @test d isa Distribution
         @test params(d) == pvals
 
@@ -90,10 +111,11 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
         @test (@inferred pdf(d, x)) isa Real
         @test rand(Xoshiro(1), d) == rand(Xoshiro(1), nd)
 
-        # Any parameter named for a moment must come back out of the built
-        # distribution, which is what checks the conversion's algebra
-        # rather than merely its types. A name this package has no reading
-        # of (`shape`, `rate`, `mass_below_centre`, …) is left alone.
+        # Any parameter named for a moment, and every elicited quantile,
+        # must come back out of the built distribution, which is what
+        # checks the conversion's algebra rather than merely its types. A
+        # name this package has no reading of (`shape`, `rate`,
+        # `mass_below_centre`, …) is left alone.
         for (n, val) in zip(names, pvals)
             if n === :mean
                 @test mean(d)≈val rtol=rtol
@@ -101,6 +123,10 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
                 @test std(d)≈val rtol=rtol
             elseif n === :var
                 @test var(d)≈val rtol=rtol
+            elseif n === :median
+                @test median(d)≈val rtol=rtol
+            elseif n isa Real
+                @test quantile(d, n)≈val rtol=rtol
             end
         end
 
@@ -110,10 +136,8 @@ function test_reparameterisation(::Type{D}, names::Tuple{Vararg{Symbol}},
         for bad in invalid
             pbad = promote(map(float, bad)...)
             @test !valid_moments(D, Val(names), pbad)
-            @test_throws DomainError reparameterise(
-                D; NamedTuple{names}(pbad)...)
-            b = reparameterise(D; check_args = false,
-                NamedTuple{names}(pbad)...)
+            @test_throws DomainError _rebuild(D, names, pbad)
+            b = _rebuild(D, names, pbad; check_args = false)
             @test logpdf(b, x) == -Inf
             @test pdf(b, x) == 0
         end

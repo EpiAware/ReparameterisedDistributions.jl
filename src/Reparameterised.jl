@@ -27,7 +27,7 @@ end
 # Build the wrapper, taking the variate form and value support from the family
 # being wrapped so a discrete family (a NegativeBinomial by mean and
 # overdispersion, say) does not silently become continuous.
-function _reparameterised(::Type{D}, names::Tuple{Vararg{Symbol}},
+function _reparameterised(::Type{D}, names::Tuple{Vararg{Union{Symbol, Real}}},
         vals::Tuple{Vararg{Real}}) where {D}
     F = Distributions.variate_form(D)
     S = Distributions.value_support(D)
@@ -55,6 +55,14 @@ Pass either the family (`LogNormal`) or an instance of it, whose parameter value
 are ignored — only its family is taken. The keywords are order-insensitive, as
 keywords are everywhere else.
 
+An elicitation often arrives as quantiles rather than moments: a delay quoted
+as a 5th and a 95th percentile. The `quantiles` keyword takes
+`probability => value` pairs, and the elicited values become the parameters, so
+a prior goes on the quantity that was elicited. Probabilities are arbitrary, and
+quantiles mix with moment keywords — one moment and one tail point is a common
+elicitation. The number of constraints has to match the family's native
+parameter count.
+
 # Arguments
 - `dist_or_type`: the native family to wrap, as a type or an instance.
 - `check_args`: whether to reject invalid parameters at construction. Left on by
@@ -63,7 +71,8 @@ keywords are everywhere else.
   exception raised in the middle of a gradient. Every other method still
   converts, so an invalid distribution has no mean, no quantile and no draw, and
   asking for one raises.
-- `alt_params`: the alternative parameters, as keywords.
+- `alt_params`: the alternative parameters, as keywords. `quantiles` is
+  reserved for elicited quantiles, given as `probability => value` pairs.
 
 !!! note
     `params` reports the moments, so the usual
@@ -94,6 +103,19 @@ d = reparameterise(LogNormal; mean = 8.0, sd = 2.0)
 params(native(d))
 ```
 
+```@example
+using ReparameterisedDistributions, Distributions
+
+d = reparameterise(LogNormal; quantiles = (0.05 => 1.2, 0.95 => 8.4))
+(params(d), quantile(d, 0.05), quantile(d, 0.95))
+```
+
+```@example
+using ReparameterisedDistributions, Distributions
+
+reparameterise(LogNormal; median = 4.0, quantiles = (0.95 => 12.0,))
+```
+
 # See also
 - [`native`](@ref): the native distribution a wrapper converts to.
 "
@@ -103,6 +125,10 @@ function reparameterise(::Type{D}; check_args::Bool = true,
     isempty(nt) && throw(ArgumentError(
         "reparameterise($(D)) needs the alternative parameters as keywords, " *
         "e.g. reparameterise($(D); mean = 8.0, sd = 2.0)"))
+    # `haskey` on a `NamedTuple` reads its type, so the branch is settled at
+    # compile time and only one path is emitted.
+    haskey(nt, :quantiles) &&
+        return _build_quantiles(D, nt; check_args = check_args)
     return _build(D, Val(keys(nt)), Tuple(nt); check_args = check_args)
 end
 
@@ -178,8 +204,25 @@ end
 # `Symbol`s, and comparing `Symbol`s goes through a `ccall` (`jl_symbol_name`)
 # that Mooncake cannot differentiate — and this sits on the sampler's hot path,
 # because a model reconstructs the distribution at every gradient evaluation.
+#
+# A name is a `Symbol` for a moment and a probability for an elicited
+# quantile, so the order is over a heterogeneous tuple: moments first,
+# alphabetically, then quantiles by ascending probability.
+#
+# This must stay CLOSED — these two methods and no others. `_canonical` is
+# generated and calls it from the generator, so it consults the method table
+# rather than merely emitting calls the way `_rows` (src/quantiles.jl) does,
+# and a generator's result is cached per signature and never invalidated by
+# a method added later. Two methods over a closed set of internal types make
+# that safe: nothing downstream can introduce a name that is neither, or
+# reorder the two. Making this extensible would give `_canonical` exactly
+# the staleness `_convertible` was rewritten to avoid, so it would have to
+# stop being generated first.
+_name_order(n::Symbol) = (0, string(n), 0.0)
+_name_order(n::Real) = (1, "", Float64(n))
+
 @generated function _canonical(::Val{names}, vals::Tuple) where {names}
-    p = sortperm(collect(names))
+    p = sortperm(collect(names), by = _name_order)
     sorted = Tuple(collect(names)[p])
     permuted = Expr(:tuple, (:(vals[$(p[i])]) for i in eachindex(p))...)
     return :(($(QuoteNode(sorted)), $permuted))
@@ -279,7 +322,9 @@ valid_moments(LogNormal, Val((:mean, :sd)), (8.0, -1.0))
 # See also
 - [`to_native`](@ref): the conversion this guards, registered alongside it.
 "
-valid_moments(::Type{D}, ::Val{names}, vals) where {D, names} = true
+function valid_moments(::Type{D}, ::Val{names}, vals) where {D, names}
+    return true
+end
 
 # Force the native conversion through the family's own argument checks once,
 # at construction. `to_native` itself builds with `check_args = false` so it
@@ -471,8 +516,21 @@ function loglikelihood(
     return loglikelihood(nd, x)
 end
 
+# The probabilities live in the type and `params` reports only the values,
+# so the printed form has to put the pairs back together.
+function _spec_string(names, vals)
+    args = String["$n = $v" for (n, v) in zip(names, vals) if n isa Symbol]
+    qs = String["$n => $v" for (n, v) in zip(names, vals) if !(n isa Symbol)]
+    # A one-element tuple keeps its trailing comma, so the printed form is
+    # still a tuple when pasted back.
+    isempty(qs) ||
+        push!(args, "quantiles = (" * join(qs, ", ") *
+                    (length(qs) == 1 ? ",)" : ")"))
+    return join(args, ", ")
+end
+
 function Base.show(io::IO, d::Reparameterised{D, names}) where {D, names}
-    args = join(("$n = $v" for (n, v) in zip(names, d.vals)), ", ")
+    args = _spec_string(names, d.vals)
     # `nameof`, not `D` itself: printing the type directly qualifies it by
     # module whenever the active module differs from the one `D` is defined
     # in (a doctest sandbox, a TestItemRunner module, ...), so the same call

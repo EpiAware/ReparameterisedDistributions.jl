@@ -32,6 +32,69 @@ nb = reparameterise(NegativeBinomial; mean = 10.0, overdispersion = 0.5)
 (mean(nb), var(nb))
 ```
 
+## Elicited quantiles
+
+A delay is as often elicited as a pair of percentiles as it is as a mean and a
+standard deviation.
+The `quantiles` keyword takes `probability => value` pairs, and those values
+become the parameters, so a prior goes on the quantity that was elicited.
+
+```@example getting-started
+q = reparameterise(LogNormal; quantiles = (0.05 => 1.2, 0.95 => 8.4))
+
+(params(q), quantile(q, 0.05), quantile(q, 0.95))
+```
+
+The probabilities are arbitrary, and are carried in the wrapper's type rather
+than reported as parameters.
+
+```@example getting-started
+params(reparameterise(Normal; quantiles = (1 / 3 => 2.0, 2 / 3 => 6.0)))
+```
+
+Elicitation often gives one moment and one tail point instead, so quantiles mix
+with moment keywords.
+The number of constraints has to match the family's native parameter count, and
+an under- or over-determined request names both counts.
+
+```@example getting-started
+reparameterise(LogNormal; median = 4.0, quantiles = (0.95 => 12.0,))
+```
+
+Values that fall as the probability rises describe no distribution at all, so
+such a pair is refused in the same way an unattainable moment is.
+
+```@example getting-started
+bad = reparameterise(Normal; quantiles = (0.25 => 3.0, 0.75 => 1.0),
+    check_args = false)
+
+logpdf(bad, 2.0)
+```
+
+## The standard moments of a location-scale family
+
+The same location-and-scale algebra answers a mean and a standard deviation
+exactly, so those families take them directly.
+
+```@example getting-started
+u = reparameterise(Uniform; mean = 5.0, sd = 2.0)
+
+(native(u), mean(u), std(u))
+```
+
+Where the moments pin nothing, the request is refused rather than solved.
+A `Cauchy` has neither a mean nor a standard deviation; one constraint leaves a
+two-parameter family short; and an `Exponential`, whose standard deviation is
+always its mean, is over-determined by both.
+
+```@example getting-started
+try
+    reparameterise(Cauchy; mean = 1.0, sd = 2.0)
+catch e
+    println(e.msg)
+end
+```
+
 ## Invalid moments
 
 Constraining each moment on its own does not always keep the combination
@@ -71,6 +134,25 @@ Asking for one raises.
 | `InverseGaussian` | `mean`, `var` | as above, given the variance |
 | `Weibull` | `mean`, `sd` | numeric: the CV pins the shape by a scalar root-find; the scale then follows in closed form |
 | `Weibull` | `mean`, `var` | as above, given the variance |
+| `Normal` | `mean`, `sd` | the native parameters themselves |
+| `Normal` | `mean`, `var` | as above, given the variance |
+| `Logistic` | `mean`, `sd` (or `var`) | `theta = sd · √3 / π` |
+| `Laplace` | `mean`, `sd` (or `var`) | `theta = sd / √2` |
+| `Uniform` | `mean`, `sd` (or `var`) | `a, b = mean ∓ √3 · sd` |
+| `Exponential` | `mean` | `scale = mean` |
+| `Normal`, `Logistic`, `Cauchy`, `Uniform`, `Laplace` | two of `quantiles`, `median`, `mean`, `sd` | two constraints linear in the location and scale, solved exactly |
+| `LogNormal` | two of `quantiles`, `median` | as above, on the logarithms |
+| `Exponential` | one of `quantiles`, `median`, `mean` | one constraint in the scale |
+
+`Cauchy` has neither a mean nor a standard deviation, and a `LogNormal`'s are
+linear in neither of its native parameters, so neither family takes those names
+alongside a quantile.
+A `Cauchy` asked for a mean and a standard deviation is refused rather than
+solved, as is a two-parameter family given one constraint, or an `Exponential`
+given both a mean and a standard deviation when its own are always equal.
+Every other family falls to the generic numeric solve for constraint sets, which
+is not wired up yet: a quantile elicitation of a `Gamma` is refused by name
+today rather than converted.
 
 `Weibull(mean, sd)` has no exact closed form.
 Its gradient stays exact under automatic differentiation.

@@ -18,7 +18,8 @@ using DifferentiationInterface: DifferentiationInterface, Constant
 import DifferentiationInterfaceTest as DIT
 import ForwardDiff, ReverseDiff, Enzyme, Mooncake
 using Distributions: Beta, Exponential, Gamma, InverseGaussian, LogNormal,
-                     NegativeBinomial, SkewNormal, Weibull, logpdf, cdf
+                     Logistic, NegativeBinomial, Normal, SkewNormal, Uniform,
+                     Weibull, logpdf, cdf
 using ReparameterisedDistributions: reparameterise
 
 export scenarios, backends, broken_scenario_names,
@@ -140,6 +141,63 @@ function _weibull_meansd_loglik(θ, obs)
     return sum(x -> logpdf(d, x), obs)
 end
 
+# `θ = [q05, q95]` — the elicited quantile VALUES are the estimable
+# parameters here, and the probabilities are constants carried in the
+# wrapper's type. The inversion solves a two-by-two linear system, so the
+# gradient runs through a reciprocal determinant.
+function _lognormal_quantiles_loglik(θ, obs)
+    d = reparameterise(LogNormal; quantiles = (0.05 => θ[1], 0.95 => θ[2]),
+        check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The same inversion without the log transform, so the transform is not the
+# only thing standing between the constraint values and the density.
+function _normal_quantiles_loglik(θ, obs)
+    d = reparameterise(Normal; quantiles = (0.25 => θ[1], 0.75 => θ[2]),
+        check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# A mixed constraint set: `θ = [median, q95]`, in the canonical order the
+# wrapper stores, so the moment row and the quantile row are differentiated
+# side by side.
+function _lognormal_mixed_loglik(θ, obs)
+    d = reparameterise(LogNormal; median = θ[1], quantiles = (0.95 => θ[2],),
+        check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# `θ = [q95]` — a one-constraint family, so the scale-only row is covered
+# as well as the two-row solve.
+function _exponential_quantile_loglik(θ, obs)
+    d = reparameterise(Exponential; quantiles = (0.95 => θ[1],),
+        check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+# The `cdf` path for a quantile constraint set, which can break
+# independently of the density path.
+function _normal_quantiles_cdf(θ, obs)
+    d = reparameterise(Normal; quantiles = (0.25 => θ[1], 0.75 => θ[2]),
+        check_args = false)
+    return sum(x -> cdf(d, x), obs)
+end
+
+# `θ = [mean, sd]` through the same constraint solve, reached by the
+# concrete `(:mean, :sd)` registration rather than the catch-all. The
+# `Uniform` scale carries a `sqrt(12)`, and its density is flat, so the
+# gradient runs through the support's own edges.
+function _uniform_meansd_loglik(θ, obs)
+    d = reparameterise(Uniform; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
+function _logistic_meansd_loglik(θ, obs)
+    d = reparameterise(Logistic; mean = θ[1], sd = θ[2], check_args = false)
+    return sum(x -> logpdf(d, x), obs)
+end
+
 """
     scenarios(; with_reference = false, category = :marginal)
 
@@ -192,7 +250,20 @@ function scenarios(; with_reference::Bool = false, category::Symbol = :marginal)
         # locally constant. Not the CV-edge cases above, which are valid
         # but numerically fragile, a different failure mode.
         ("Gamma(mean, sd) loglik at invalid moments", _gamma_meansd_loglik,
-            [-8.0, 3.0], reals))
+            [-8.0, 3.0], reals),
+        ("LogNormal(quantiles) loglik", _lognormal_quantiles_loglik,
+            [1.2, 8.4], reals),
+        ("Normal(quantiles) loglik", _normal_quantiles_loglik, [4.0, 10.0],
+            reals),
+        ("Normal(quantiles) cdf", _normal_quantiles_cdf, [4.0, 10.0], reals),
+        ("LogNormal(median, quantiles) loglik", _lognormal_mixed_loglik,
+            [4.0, 12.0], reals),
+        ("Exponential(quantiles) loglik", _exponential_quantile_loglik,
+            [20.0], reals),
+        ("Uniform(mean, sd) loglik", _uniform_meansd_loglik, [8.0, 3.0],
+            reals),
+        ("Logistic(mean, sd) loglik", _logistic_meansd_loglik, [8.0, 3.0],
+            reals))
 
     for (name, f, θ, contexts) in cases
         push!(out,
