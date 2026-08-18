@@ -44,8 +44,8 @@ import{_ as s,o as E,c as I,an as k}from"./chunks/framework.Dup0iG1q.js";const S
 <span class="line"><span>Iterations        = 501:1:1500</span></span>
 <span class="line"><span>Number of chains  = 1</span></span>
 <span class="line"><span>Samples per chain = 1000</span></span>
-<span class="line"><span>Wall duration     = 2.84 seconds</span></span>
-<span class="line"><span>Compute duration  = 2.84 seconds</span></span>
+<span class="line"><span>Wall duration     = 2.46 seconds</span></span>
+<span class="line"><span>Compute duration  = 2.46 seconds</span></span>
 <span class="line"><span>parameters        = delay_mean, delay_sd</span></span>
 <span class="line"><span>internals         = n_steps, is_accept, acceptance_rate, log_density, hamiltonian_energy, hamiltonian_energy_error, max_hamiltonian_energy_error, tree_depth, numerical_error, step_size, nom_step_size, logprior, loglikelihood, logjoint</span></span>
 <span class="line"><span></span></span>
