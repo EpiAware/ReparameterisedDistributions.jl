@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 440">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 440" role="img" aria-label="ReparameterisedDistributions.jl logo">
+  <title>ReparameterisedDistributions.jl logo</title>
   <polygon points="200,30 364.5,125 364.5,315 200,410 35.5,315 35.5,125" fill="none" stroke="#64748b" stroke-width="2" stroke-linejoin="round" opacity="0.4"/>
   
   <!-- The Distribution Curve -->
@@ -19,7 +20,4 @@
   <!-- Mapping Vectors (Showing the transformation) -->
   <path d="M 160,240 C 150,255 140,255 130,270" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3 3"/>
   <path d="M 240,240 C 250,255 260,255 270,270" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3 3"/>
-
-  <text x="200" y="335" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="#64748b" text-anchor="middle">Reparameterised</text>
-  <text x="200" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#94a3b8" text-anchor="middle">Distributions.jl</text>
 </svg>
