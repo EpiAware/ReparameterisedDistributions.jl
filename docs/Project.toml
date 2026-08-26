@@ -1,16 +1,3 @@
-# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
-# The documentation environment: Documenter + DocumenterVitepress (the org docs
-# standard). Add doc-only deps (e.g. plotting, DocumenterCitations) here as the
-# docs grow. The package itself is pinned by path via `[sources]`.
-# The managed `docs/make.jl` calls `using EpiAwarePackageTools` (the shared docs
-# build machinery), so the kit is a docs dep too; it is a normal registered
-# dependency below.
-# With `ad = true` the env also carries what the kit-managed AD-backends
-# tutorial page executes against: the package's `ADFixtures` registry (pinned
-# by path, same UUID as the AD test env) plus the benchmark and plotting stack.
-# With `benchmarks = true` it also carries `Plots` for the benchmark page's
-# combined trend plot (lazily loaded kit-side; absent here, the plot degrades
-# to an `@info` note rather than failing the build).
 [deps]
 ADFixtures = "38d65565-7409-4a25-8dde-f48d00d9209f"
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
