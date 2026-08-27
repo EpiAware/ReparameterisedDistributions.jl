@@ -1,4 +1,3 @@
-# PACKAGE-OWNED — scaffold writes this once and never overwrites it.
 name = "ADFixtures"
 uuid = "38d65565-7409-4a25-8dde-f48d00d9209f"
 authors = ["Sam Abbott, Michael DeWitt"]
