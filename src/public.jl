@@ -6,12 +6,18 @@
 # types are public.
 public AbstractReparameterisedDistribution, Reparameterised
 
-# `solve_moment` is the driver a family with no exact closed form calls from
-# within its own `to_native` method, and `test_reparameterisation` is the
+# `solve_moment` and `solve_moments` are the drivers a family with no exact
+# closed form calls from within its own `to_native` method — one scalar
+# equation, or a system of them — and `test_reparameterisation` is the
 # interface test suite a registration — this package's own or another
-# package's — is checked against. Both are called rather than extended, so
-# both are public rather than exported, like the two registration hooks.
-public solve_moment, test_reparameterisation
+# package's — is checked against. All are called rather than extended, so
+# all are public rather than exported, like the registration hooks.
+public solve_moment, solve_moments, test_reparameterisation
+
+# `native_domains` is the third extension point, read by the
+# standard-moment fallback: a family whose native parameters are not all
+# positive registers it so the fallback solves in the right coordinates.
+public native_domains
 
 # `to_native` and `valid_moments` are the two per-family extension points a
 # registration implements (see families.jl for the pattern a new
