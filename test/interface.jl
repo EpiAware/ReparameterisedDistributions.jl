@@ -33,12 +33,37 @@
         (InverseGaussian, (:mean, :var), (3.0, 4.0),
             ((3.0, -4.0), (-3.0, 4.0))),
         (Weibull, (:mean, :sd), (8.0, 3.0), ((8.0, -3.0), (-8.0, 3.0))),
-        (Weibull, (:mean, :var), (8.0, 9.0), ((8.0, -9.0), (-8.0, 9.0)))
+        (Weibull, (:mean, :var), (8.0, 9.0), ((8.0, -9.0), (-8.0, 9.0))),
+        # The quantile constraint sets. A probability stands where a
+        # `Symbol` would, and the invalid points are a decreasing pair,
+        # which describes no distribution rather than a hard solve.
+        (Normal, (0.25, 0.75), (1.0, 3.0), ((3.0, 1.0), (1.0, 1.0))),
+        (Logistic, (0.25, 0.75), (1.0, 3.0), ((3.0, 1.0),)),
+        (Cauchy, (0.25, 0.75), (1.0, 3.0), ((3.0, 1.0),)),
+        (Laplace, (0.25, 0.75), (1.0, 3.0), ((3.0, 1.0),)),
+        (Uniform, (0.25, 0.75), (1.0, 3.0), ((3.0, 1.0),)),
+        (LogNormal, (0.05, 0.95), (1.2, 8.4), ((8.4, 1.2), (-1.2, 8.4))),
+        (Exponential, (0.95,), (3.0,), ((-3.0,), (0.0,))),
+        (LogNormal, (:median, 0.95), (4.0, 12.0), ((12.0, 4.0),)),
+        (Normal, (:mean, 0.95), (8.0, 20.0), ((20.0, 8.0),)),
+        (Normal, (:sd, 0.95), (2.0, 20.0), ((-2.0, 20.0),)),
+        # The standard moments, where a location and a scale are what they
+        # already are. Registered concretely so they stay unambiguous
+        # against the mirror generic in src/standard_moments.jl.
+        (Normal, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0), (5.0, 0.0))),
+        (Normal, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Logistic, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0),)),
+        (Logistic, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Laplace, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0),)),
+        (Laplace, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Uniform, (:mean, :sd), (5.0, 2.0), ((5.0, -2.0),)),
+        (Uniform, (:mean, :var), (5.0, 4.0), ((5.0, -4.0),)),
+        (Exponential, (:mean,), (4.0,), ((-4.0,), (0.0,)))
     ]
 
     # Guard the guard: one case per registered pair, so a family added
     # without a case here fails this count rather than going unchecked.
-    @test length(cases) == 16
+    @test length(cases) == 35
 
     for (D, names, vals, invalid) in cases
         test_reparameterisation(D, names, vals; invalid = invalid)
@@ -51,26 +76,30 @@ end
 
     # A registration made exactly as a downstream package makes one: add a
     # method to each of the two hooks, then check the result with the same
-    # interface suite this package uses on its own families. `Laplace` is a
-    # Distributions.jl family this package does not register, so nothing
-    # here shadows a shipped method.
+    # interface suite this package uses on its own families. `Gumbel` is a
+    # Distributions.jl family this package registers by nothing at all, so
+    # the pair below shadows no shipped method. `Laplace` would not do:
+    # it is in `_LinearMoments`, so this package already registers it by
+    # `(:mean, :sd)` and the example would be shadowing rather than adding.
     #
-    # `Laplace(mu, theta)` has mean `mu` and variance `2 * theta^2`, so the
-    # location is native and `theta = sd / sqrt(2)`. The location is
-    # unconstrained, so only the scale is guarded.
+    # `Gumbel(mu, theta)` has mean `mu + theta * eulergamma` and variance
+    # `theta^2 * pi^2 / 6`, so both native parameters are derived. The
+    # location is unconstrained, so only the scale is guarded.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :sd)}, vals)
         _, sd = vals
         return sd > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Laplace}, ::Val{(:mean, :sd)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :sd)}, vals)
         m, sd = vals
-        return Laplace(m, sd / sqrt(oftype(sd, 2)); check_args = false)
+        theta = sd * sqrt(oftype(sd, 6)) / oftype(sd, pi)
+        return Gumbel(m - theta * oftype(sd, Base.MathConstants.eulergamma),
+            theta; check_args = false)
     end
 
-    test_reparameterisation(Laplace, (:mean, :sd), (3.0, 2.0);
+    test_reparameterisation(Gumbel, (:mean, :sd), (3.0, 2.0);
         invalid = ((3.0, -2.0), (3.0, 0.0)))
 end
 
@@ -112,50 +141,54 @@ end
         @test !(Nothing <: rt)
     end
 
-    # `Cauchy(location, scale)` is not registered by this package.
-    # Register it under the wrong, unsorted name order, the mistake
-    # `adding-a-reparameterisation.md` warns against: `reparameterise`
-    # always sorts keywords before dispatching. Asking for the canonical
-    # `(:location, :scale)` order finds no such method, only the
+    # `Pareto(shape, scale)` is not registered by this package at all, not
+    # even by quantile constraints, so nothing stands between it and the
+    # fallback. Register it under the wrong, unsorted name order, the
+    # mistake `adding-a-reparameterisation.md` warns against:
+    # `reparameterise` always sorts keywords before dispatching. Asking for
+    # the canonical `(:scale, :shape)` order finds no such method, only the
     # error-raising fallback, exactly as it would for every caller of
     # `reparameterise` on an uncanonically registered family.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
-        scale, _ = vals
-        return scale > 0
+            ::Type{Pareto}, ::Val{(:shape, :scale)}, vals)
+        shape, scale = vals
+        return shape > 0 && scale > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Cauchy}, ::Val{(:scale, :location)}, vals)
-        scale, location = vals
-        return Cauchy(location, scale; check_args = false)
+            ::Type{Pareto}, ::Val{(:shape, :scale)}, vals)
+        shape, scale = vals
+        return Pareto(shape, scale; check_args = false)
     end
 
-    let argtypes = (Type{Cauchy}, Val{(:location, :scale)},
+    let argtypes = (Type{Pareto}, Val{(:scale, :shape)},
             Tuple{Float64, Float64})
         fallback = which(to_native,
-            (Type{Cauchy}, Val{(:_unregistered_,)}, Tuple{Float64, Float64}))
+            (Type{Pareto}, Val{(:_unregistered_,)}, Tuple{Float64, Float64}))
         @test which(to_native, argtypes) === fallback
     end
 
-    # `Laplace(mean, var)` is not registered by this package either.
-    # `to_native` here is exactly the #86 shape: a branch that can return
-    # `nothing`, so its inferred return type is a `Union` even though this
-    # particular call (`var = 2.0 > 0`) never actually takes that branch.
+    # `Gumbel(mean, var)` is not registered by this package either — and
+    # `Laplace(mean, var)` no longer qualifies, since `_LinearMoments`
+    # covers it. `to_native` here is exactly the #86 shape: a branch that
+    # can return `nothing`, so its inferred return type is a `Union` even
+    # though this particular call (`var = 2.0 > 0`) never takes that branch.
     function ReparameterisedDistributions.valid_moments(
-            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :var)}, vals)
         _, v = vals
         return v > 0
     end
 
     function ReparameterisedDistributions.to_native(
-            ::Type{Laplace}, ::Val{(:mean, :var)}, vals)
+            ::Type{Gumbel}, ::Val{(:mean, :var)}, vals)
         m, v = vals
         v <= 0 && return nothing
-        return Laplace(m, sqrt(v / oftype(v, 2)); check_args = false)
+        theta = sqrt(v) * sqrt(oftype(v, 6)) / oftype(v, pi)
+        return Gumbel(m - theta * oftype(v, Base.MathConstants.eulergamma),
+            theta; check_args = false)
     end
 
-    let argtypes = (Type{Laplace}, Val{(:mean, :var)},
+    let argtypes = (Type{Gumbel}, Val{(:mean, :var)},
             Tuple{Float64, Float64})
         rt = only(Base.return_types(to_native, argtypes))
         @test Nothing <: rt
