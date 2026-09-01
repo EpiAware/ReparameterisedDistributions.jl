@@ -29,7 +29,7 @@ DifferentiationInterface = "0.6, 0.7"
 DifferentiationInterfaceTest = "0.9, 0.10, 0.11"
 Distributions = "0.25"
 Documenter = "1"
-EpiAwarePackageTools = "0.3"
+EpiAwarePackageTools = "0.3, 0.4"
 ExplicitImports = "1"
 ForwardDiff = "0.10, 1"
 JET = "0.9, 0.10, 0.11, 0.12"
@@ -41,7 +41,7 @@ Statistics = "1"
 Test = "1"
 TestItemRunner = "1"
 TestItems = "1"
-Turing = "0.44, 0.46"
+Turing = "0.44, 0.46, 0.47"
 
 [sources]
 ReparameterisedDistributions = {path = ".."}
